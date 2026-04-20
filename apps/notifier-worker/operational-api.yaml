@@ -1,0 +1,134 @@
+openapi: '3.1.0'
+info:
+  title: notifier-worker Operational API
+  description: Health, readiness, metrics, and info endpoints for the notifier-worker sidecar
+  version: '0.1.0'
+
+servers:
+  - url: http://localhost:8082
+    description: Local development
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      description: Returns 200 if the consumer loop heartbeat is fresh (< 30s old), 503 otherwise.
+      responses:
+        '200':
+          description: Worker is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOk'
+        '503':
+          description: Heartbeat stale — consumer loop may be stuck
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthFail'
+
+  /readyz:
+    get:
+      summary: Readiness probe
+      description: Returns 200 only when Redis is connected AND the consumer group has been joined.
+      responses:
+        '200':
+          description: Worker is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyOk'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyFail'
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      description: Exposes Prometheus-format metrics for scraping.
+      responses:
+        '200':
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /info:
+    get:
+      summary: Service metadata
+      description: Returns static information about the running worker instance.
+      responses:
+        '200':
+          description: Service info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+
+components:
+  schemas:
+    HealthOk:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    HealthFail:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          example: unhealthy
+        reason:
+          type: string
+          example: heartbeat_stale
+
+    ReadyOk:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ready
+
+    ReadyFail:
+      type: object
+      required: [status, redis, consumer_group_joined]
+      properties:
+        status:
+          type: string
+          example: not_ready
+        redis:
+          type: boolean
+        consumer_group_joined:
+          type: boolean
+
+    Info:
+      type: object
+      required: [service, version, commit, consumer_id, consumer_group, node_version]
+      properties:
+        service:
+          type: string
+          example: notifier-worker
+        version:
+          type: string
+          example: 0.1.0
+        commit:
+          type: string
+          example: abc1234
+        consumer_id:
+          type: string
+          example: notifier-hostname-12345
+        consumer_group:
+          type: string
+          example: notifier-workers
+        node_version:
+          type: string
+          example: v22.0.0

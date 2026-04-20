@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polyglot-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD: orders_dev
+      POSTGRES_DB: orders
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - polyglot-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orders -d orders"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: polyglot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - polyglot-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: polyglot-redis-insight
+    ports:
+      - "5540:5540"
+    networks:
+      - polyglot-dev
+    profiles:
+      - tools
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  polyglot-dev:
+    driver: bridge

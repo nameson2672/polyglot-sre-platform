@@ -1,0 +1,371 @@
+openapi: 3.1.0
+info:
+  title: checkout-bff
+  version: 0.1.0
+  description: BFF service for checkout and order management, fronting orders-api.
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      operationId: getHealthz
+      tags: [ops]
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+
+  /readyz:
+    get:
+      summary: Readiness probe
+      operationId: getReadyz
+      tags: [ops]
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /info:
+    get:
+      summary: Service metadata
+      operationId: getInfo
+      tags: [ops]
+      responses:
+        '200':
+          description: Service info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                  version:
+                    type: string
+                  commit:
+                    type: string
+                  node_version:
+                    type: string
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: getMetrics
+      tags: [ops]
+      responses:
+        '200':
+          description: Prometheus text format metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /v1/checkout:
+    post:
+      summary: Initiate a checkout
+      operationId: postCheckout
+      tags: [checkout]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '201':
+          description: Checkout confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetails'
+        '401':
+          $ref: '#/components/responses/ProblemDetails'
+        '402':
+          $ref: '#/components/responses/ProblemDetails'
+        '503':
+          $ref: '#/components/responses/ProblemDetails'
+
+  /v1/checkout/{sessionId}:
+    get:
+      summary: Get checkout session
+      operationId: getCheckoutSession
+      tags: [checkout]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutSession'
+        '404':
+          $ref: '#/components/responses/ProblemDetails'
+
+  /v1/checkout/{sessionId}/confirm:
+    post:
+      summary: Confirm a checkout session
+      operationId: confirmCheckoutSession
+      tags: [checkout]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutSession'
+        '404':
+          $ref: '#/components/responses/ProblemDetails'
+
+  /v1/checkout/leak:
+    get:
+      summary: CHAOS - fd leak demo endpoint
+      operationId: checkoutLeak
+      tags: [chaos]
+      description: |
+        CHAOS: Creates a new undici Agent per request without closing it.
+        Demonstrates file descriptor leak. DO NOT use in production.
+      responses:
+        '200':
+          description: Leak triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /v1/customer/orders:
+    get:
+      summary: List orders for authenticated customer
+      operationId: listCustomerOrders
+      tags: [customer]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated orders list
+          headers:
+            X-Cache:
+              schema:
+                type: string
+                enum: [HIT, MISS]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersListResponse'
+        '401':
+          $ref: '#/components/responses/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ProblemDetails:
+      description: RFC 7807 Problem Details
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    ProblemDetails:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, shutting_down]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+
+    CheckoutItem:
+      type: object
+      required: [sku, qty, unit_price_cents]
+      properties:
+        sku:
+          type: string
+          minLength: 1
+        qty:
+          type: integer
+          minimum: 1
+        unit_price_cents:
+          type: integer
+          minimum: 0
+
+    CheckoutRequest:
+      type: object
+      required: [items, payment_method]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutItem'
+          minItems: 1
+        payment_method:
+          type: string
+          minLength: 1
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: USD
+        customer_id:
+          type: string
+          format: uuid
+
+    CheckoutResponse:
+      type: object
+      required: [checkout_id, order_id, status, total_cents]
+      properties:
+        checkout_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [confirmed]
+        total_cents:
+          type: integer
+
+    CheckoutSession:
+      type: object
+      properties:
+        checkout_id:
+          type: string
+        order_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+        total_cents:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        payment_transaction_id:
+          type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        total_cents:
+          type: integer
+        currency:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrdersListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
