@@ -1,0 +1,39 @@
+# Health & Readiness checks for all three services
+# Run these first to confirm the stack is up before testing flows.
+# Expected: all return 200. If any return 503, that service isn't ready yet.
+
+
+
+
+### orders-api — liveness
+GET {{ordersApiUrl}}/healthz
+
+### orders-api — readiness (checks Postgres + Redis)
+GET {{ordersApiUrl}}/readyz
+
+### orders-api — Prometheus metrics
+GET {{ordersApiUrl}}/metrics
+
+### orders-api — OpenAPI spec (paste into https://editor.swagger.io to browse)
+GET {{ordersApiUrl}}/openapi/v1.json
+
+### checkout-bff — livenes
+GET {{checkoutBffUrl}}/healthz
+
+### checkout-bff — readiness (checks orders-api + Redis)
+GET {{checkoutBffUrl}}/readyz
+
+### checkout-bff — Prometheus metrics
+GET {{checkoutBffUrl}}/metrics
+
+### notifier-worker — liveness (also checks heartbeat staleness)
+GET {{notifierWorkerUrl}}/healthz
+
+### notifier-worker — readiness (checks Redis connection + consumer group joined)
+GET {{notifierWorkerUrl}}/readyz
+
+### notifier-worker — service info (version, consumer_id, consumer_group)
+GET {{notifierWorkerUrl}}/info
+
+### notifier-worker — Prometheus metrics (consumer lag is the primary SLI)
+GET {{notifierWorkerUrl}}/metrics

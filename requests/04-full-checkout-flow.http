@@ -1,0 +1,141 @@
+# Full end-to-end checkout flow
+#
+# Run each ### block IN ORDER — variables captured from one step are used in the next.
+# The REST Client keeps @variables alive for the lifetime of the file session.
+#
+# Flow:
+#   Step 1  POST /v1/checkout          → BFF: payment stub + orders-api + Redis cache
+#   Step 2  GET  /v1/checkout/:id      → BFF: reads checkout session from Redis
+#   Step 3  GET  /v1/orders/:id        → orders-api: confirms order exists in Postgres
+#   Step 4  GET  /v1/customer/orders   → BFF: cache miss → orders-api → cache (30s)
+#   Step 5  GET  /v1/customer/orders   → BFF: cache hit (same request within 30s)
+#   Step 6  PATCH /v1/orders/:id       → orders-api: pending → confirmed (writes outbox)
+#   Step 7  PATCH /v1/orders/:id       → orders-api: confirmed → shipped (writes outbox)
+#   Step 8  GET  /notifier/readyz      → verify notifier-worker consumed the events
+#   Step 9  GET  /notifier/metrics     → check consumer lag dropped to 0
+
+@ordersApiUrl      = {{$dotenv ordersApiUrl}}
+@checkoutBffUrl    = {{$dotenv checkoutBffUrl}}
+@notifierWorkerUrl = {{$dotenv notifierWorkerUrl}}
+@apiKey            = {{$dotenv apiKey}}
+@jwtToken          = {{$dotenv jwtToken}}
+
+# ── Step 1: Create checkout ───────────────────────────────────────────────────
+# Expected: 201 Created
+# Side effects:
+#   - payment stub runs in-process (~300ms, 2% chance of 402)
+#   - POST /v1/orders called on orders-api with retry policy (up to 2 retries on 5xx)
+#   - Postgres: INSERT orders + order_items + outbox(order.created) + idempotency_keys (atomic tx)
+#   - Redis: SET checkout:{checkoutId} (TTL 3600s)
+# @name step1_createCheckout
+POST {{checkoutBffUrl}}/v1/checkout
+Authorization: Bearer {{jwtToken}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [
+    { "sku": "WIDGET-001", "qty": 2, "unit_price_cents": 1999 },
+    { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
+  ]
+}
+
+@checkoutId = {{step1_createCheckout.response.body.$.checkout_id}}
+@orderId    = {{step1_createCheckout.response.body.$.order_id}}
+
+### Step 2: Retrieve checkout session from Redis
+# Expected: 200 with the session (checkout_id, order_id, status, total_cents)
+# This never touches Postgres — Redis only.
+# If you see 404 here, the order in Step 1 failed.
+GET {{checkoutBffUrl}}/v1/checkout/{{checkoutId}}
+
+### Step 3: Verify the order exists in Postgres (direct orders-api call)
+# Expected: 200 with status "pending"
+# status=pending is the initial state — the BFF doesn't auto-confirm the order.
+GET {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+
+### Step 4: List customer orders via BFF — first call (cache MISS)
+# Expected: 200, x-cache: MISS header
+# orders-api is called, result cached in Redis for 30s under
+# key customer:{customerId}:orders:page=1:size=10
+# @name step4_listOrdersMiss
+GET {{checkoutBffUrl}}/v1/customer/orders?page=1&size=10
+Authorization: Bearer {{jwtToken}}
+
+### Step 5: Same list again — should be cache HIT
+# Expected: 200, x-cache: HIT header (no Postgres or orders-api call)
+# Run within 30 seconds of Step 4 to see the HIT.
+GET {{checkoutBffUrl}}/v1/customer/orders?page=1&size=10
+Authorization: Bearer {{jwtToken}}
+
+### Step 6: Confirm the order (pending → confirmed)
+# Expected: 200 with status "confirmed"
+# Side effects:
+#   - Postgres: UPDATE orders SET status='confirmed' + INSERT outbox(order.confirmed) (atomic tx)
+#   - OutboxPublisher (background, ~1s delay): XADD orders.events with event_type=order.confirmed
+#   - notifier-worker: XREADGROUP picks it up, POSTs to WEBHOOK_URL
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "confirmed",
+  "reason": "payment verified"
+}
+
+### Step 7: Ship the order (confirmed → shipped)
+# Expected: 200 with status "shipped"
+# Side effects: same outbox pattern, emits order.shipped event to Redis stream
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "shipped",
+  "reason": "dispatched via courier"
+}
+
+### Step 8: Verify order final state
+# Expected: 200 with status "shipped"
+GET {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+
+### Step 9: Check notifier-worker readiness (consumer group joined + heartbeat fresh)
+# Expected: 200 { "status": "ready" }
+# If 503, the worker lost its Redis connection or the heartbeat went stale.
+GET {{notifierWorkerUrl}}/readyz
+
+### Step 10: Check consumer lag
+# Expected: notifier_consumer_lag 0 (all events processed)
+# If lag > 0, the webhook is failing or the worker is behind.
+# Look for these metrics:
+#   notifier_consumer_lag
+#   notifier_events_consumed_total{event_type="order.created",status="success"}
+#   notifier_events_consumed_total{event_type="order.confirmed",status="success"}
+#   notifier_events_consumed_total{event_type="order.shipped",status="success"}
+GET {{notifierWorkerUrl}}/metrics
+
+### Step 11: Cache is now stale — re-list to confirm shipped status appears
+# Expected: 200, x-cache: MISS (previous 30s cache has expired if you waited, or HIT with stale data)
+GET {{checkoutBffUrl}}/v1/customer/orders?page=1&size=10
+Authorization: Bearer {{jwtToken}}
+
+# ── Bonus: Replay protection ──────────────────────────────────────────────────
+
+### Replay the same checkout with the same Idempotency-Key → should return cached 201
+# The BFF doesn't enforce idempotency itself — orders-api does.
+# The BFF will call orders-api again with the same key, which returns the cached order.
+POST {{checkoutBffUrl}}/v1/checkout
+Authorization: Bearer {{jwtToken}}
+Idempotency-Key: {{step1_createCheckout.request.headers.Idempotency-Key}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [
+    { "sku": "WIDGET-001", "qty": 2, "unit_price_cents": 1999 },
+    { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
+  ]
+}

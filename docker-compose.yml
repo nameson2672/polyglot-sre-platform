@@ -1,4 +1,5 @@
 services:
+  # ── Infrastructure ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: polyglot-postgres
@@ -44,9 +45,124 @@ services:
     profiles:
       - tools
 
+  # ── Application Services ──────────────────────────────────────────────────────
+
+  orders-api:
+    image: mcr.microsoft.com/dotnet/sdk:10.0-noble
+    container_name: polyglot-orders-api
+    working_dir: /workspace
+    command: >
+      bash -c "
+        [ -f /vsdbg/vsdbg ] || curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg &&
+        dotnet run --project src/OrdersApi --no-launch-profile
+      "
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      POSTGRES_CONNECTION_STRING: "Host=postgres;Port=5432;Database=orders;Username=orders;Password=orders_dev"
+      REDIS_URL: redis://redis:6379
+      ORDERS_API_KEY: dev-api-key-change-me
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    volumes:
+      - ./apps/orders-api:/workspace
+      - orders_api_nuget:/root/.nuget/packages
+      - vsdbg:/vsdbg
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - polyglot-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  checkout-bff:
+    image: node:22-alpine
+    container_name: polyglot-checkout-bff
+    working_dir: /workspace
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "8081:8081"
+      - "9229:9229"
+    environment:
+      CHECKOUT_BFF_PORT: "8081"
+      ORDERS_API_URL: http://orders-api:8080
+      ORDERS_API_KEY: dev-api-key-change-me
+      JWT_SECRET: dev-jwt-secret-change-me
+      REDIS_URL: redis://redis:6379
+      PAYMENT_STUB_LATENCY_MS: "300"
+      PAYMENT_STUB_FAILURE_RATE: "0.02"
+      LOG_LEVEL: debug
+      APP_ENV: dev
+      NODE_OPTIONS: "--inspect=0.0.0.0:9229"
+    volumes:
+      - ./apps/checkout-bff:/workspace
+      - checkout_bff_node_modules:/workspace/node_modules
+    networks:
+      - polyglot-dev
+    depends_on:
+      orders-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  notifier-worker:
+    image: node:22-alpine
+    container_name: polyglot-notifier-worker
+    working_dir: /workspace
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "8082:8082"
+      - "9230:9230"
+    environment:
+      NOTIFIER_WORKER_PORT: "8082"
+      REDIS_URL: redis://redis:6379
+      WEBHOOK_URL: https://webhook.site/REPLACE-WITH-YOUR-UUID
+      WEBHOOK_AUTH_TOKEN: dev-webhook-token
+      CONSUMER_GROUP: notifier-workers
+      ENABLE_DLQ: "false"
+      LOG_LEVEL: debug
+      NODE_OPTIONS: "--inspect=0.0.0.0:9230"
+    volumes:
+      - ./apps/notifier-worker:/workspace
+      - notifier_worker_node_modules:/workspace/node_modules
+    networks:
+      - polyglot-dev
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   pg_data:
   redis_data:
+  orders_api_nuget:
+  vsdbg:
+  checkout_bff_node_modules:
+  notifier_worker_node_modules:
 
 networks:
   polyglot-dev:

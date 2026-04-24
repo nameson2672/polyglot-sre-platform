@@ -1,0 +1,168 @@
+# orders-api — direct CRUD
+# All routes require X-Api-Key header.
+# POST /v1/orders also requires Idempotency-Key (UUID).
+#
+# State machine: pending → confirmed → shipped
+#                pending → cancelled
+#                confirmed → cancelled
+#
+# Run requests top-to-bottom: each ### block captures @orderId for the ones below.
+
+
+# ── Create ───────────────────────────────────────────────────────────────────
+
+# @name createOrder
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "USD",
+  "items": [
+    { "sku": "WIDGET-001", "qty": 2, "unit_price_cents": 1999 },
+    { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
+  ]
+}
+
+# Capture the new order id for all requests below.
+# Re-send ↑ first whenever you want a fresh order to work with.
+# @orderId = {{createOrder.response.body.$.id}}
+
+### Idempotency replay — same key, same body → 200 with cached response
+# Change the Idempotency-Key value in createOrder above and re-send to get a fresh key,
+# then re-send THIS request to see the idempotency hit in action.
+# @name replayOrder
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{createOrder.request.headers.Idempotency-Key}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "USD",
+  "items": [
+    { "sku": "WIDGET-001", "qty": 2, "unit_price_cents": 1999 },
+    { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
+  ]
+}
+
+### Idempotency conflict — same key, different body → 409
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{createOrder.request.headers.Idempotency-Key}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "EUR",
+  "items": [
+    { "sku": "DIFFERENT-SKU", "qty": 1, "unit_price_cents": 100 }
+  ]
+}
+
+# ── Read ─────────────────────────────────────────────────────────────────────
+
+### Get order by id
+GET {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+
+### List orders for customer (paginated)
+GET {{ordersApiUrl}}/v1/orders?customer_id={{customerId}}&page=1&page_size=10
+X-Api-Key: {{apiKey}}
+
+### List orders — page 2
+GET {{ordersApiUrl}}/v1/orders?customer_id={{customerId}}&page=2&page_size=5
+X-Api-Key: {{apiKey}}
+
+# ── Status transitions ────────────────────────────────────────────────────────
+
+### Confirm order (pending → confirmed)
+# Each status transition also writes an outbox row and emits an event to the Redis stream.
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "confirmed"
+}
+
+### Ship order (confirmed → shipped)
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "shipped",
+  "reason": "dispatched via courier"
+}
+
+### Invalid transition (shipped → pending) → 422 Unprocessable Entity
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "pending"
+}
+
+### Invalid status value → 400
+PATCH {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "flying"
+}
+
+# ── Cancel ───────────────────────────────────────────────────────────────────
+
+### Cancel order — create a fresh one first, then cancel it
+# @name cancelableOrder
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "USD",
+  "items": [
+    { "sku": "CANCEL-ME", "qty": 1, "unit_price_cents": 500 }
+  ]
+}
+
+@cancelableOrderId = {{cancelableOrder.response.body.$.id}}
+
+### Delete (cancel) the order above → 204 No Content
+DELETE {{ordersApiUrl}}/v1/orders/{{cancelableOrderId}}
+X-Api-Key: {{apiKey}}
+
+### Confirm it was soft-deleted (status = cancelled)
+GET {{ordersApiUrl}}/v1/orders/{{cancelableOrderId}}
+X-Api-Key: {{apiKey}}
+
+# ── Auth errors ───────────────────────────────────────────────────────────────
+
+### Missing API key → 401
+GET {{ordersApiUrl}}/v1/orders/{{orderId}}
+
+### Wrong API key → 401
+GET {{ordersApiUrl}}/v1/orders/{{orderId}}
+X-Api-Key: wrong-key
+
+### Missing Idempotency-Key → 400
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "USD",
+  "items": [{ "sku": "SKU-1", "qty": 1, "unit_price_cents": 100 }]
+}
+
+### Order not found → 404
+GET {{ordersApiUrl}}/v1/orders/00000000-0000-0000-0000-000000000000
+X-Api-Key: {{apiKey}}

@@ -1,0 +1,198 @@
+# Chaos & SRE training endpoints
+#
+# These demonstrate deliberate failure modes built into the platform.
+# Watch Prometheus metrics and logs while running these.
+#
+# Useful while testing:
+#   docker compose logs -f orders-api checkout-bff notifier-worker
+#   open http://localhost:9229 (checkout-bff debug)
+
+@ordersApiUrl      = {{$dotenv ordersApiUrl}}
+@checkoutBffUrl    = {{$dotenv checkoutBffUrl}}
+@notifierWorkerUrl = {{$dotenv notifierWorkerUrl}}
+@apiKey            = {{$dotenv apiKey}}
+@jwtToken          = {{$dotenv jwtToken}}
+
+# ── Latency ───────────────────────────────────────────────────────────────────
+
+### Slow endpoint — intentional 2s sleep (SLO breach demo)
+# Expected: 200 after ~2000ms
+# Watch: orders-api request duration histogram spikes
+# The checkout-bff has a 5s bodyTimeout to orders-api, so this won't timeout from BFF side.
+GET {{ordersApiUrl}}/v1/orders/slow
+X-Api-Key: {{apiKey}}
+
+# ── File descriptor leak ──────────────────────────────────────────────────────
+
+### FD leak — creates a new undici Agent per request, never closes it
+# Expected: 200 { "status": "leaked" }
+# Hit this endpoint repeatedly to grow open file descriptors in the BFF process.
+# Watch with: docker exec polyglot-checkout-bff sh -c "ls /proc/1/fd | wc -l"
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+### Hit it 5 more times to accumulate leaks (send each one manually or use the loop)
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+###
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+###
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+###
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+###
+GET {{checkoutBffUrl}}/v1/checkout/leak
+
+### Check fd count after leaking
+# Run in terminal: docker exec polyglot-checkout-bff sh -c "ls /proc/1/fd | wc -l"
+
+# ── Idempotency conflicts ─────────────────────────────────────────────────────
+
+### Step 1: Create an order and capture its idempotency key
+# @name chaosOrder
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000099",
+  "currency": "USD",
+  "items": [{ "sku": "ORIGINAL", "qty": 1, "unit_price_cents": 1000 }]
+}
+
+### Step 2: Replay with same key + different body → 409 Conflict
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{chaosOrder.request.headers.Idempotency-Key}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000099",
+  "currency": "EUR",
+  "items": [{ "sku": "DIFFERENT", "qty": 99, "unit_price_cents": 9999 }]
+}
+
+# ── State machine violations ───────────────────────────────────────────────────
+
+### Create an order to try invalid transitions on
+# @name transitionOrder
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000099",
+  "currency": "USD",
+  "items": [{ "sku": "TRANSITION-TEST", "qty": 1, "unit_price_cents": 500 }]
+}
+
+@transitionOrderId = {{transitionOrder.response.body.$.id}}
+
+### Try shipping directly from pending (skip confirmed) → 422
+PATCH {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "shipped"
+}
+
+### Confirm it first (valid)
+PATCH {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "confirmed"
+}
+
+### Try going back to pending from confirmed → 422
+PATCH {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "pending"
+}
+
+### Ship it (valid)
+PATCH {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "shipped"
+}
+
+### Try cancelling a shipped order → 422
+PATCH {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}
+
+### Delete a shipped order → 404 or 422 depending on implementation
+DELETE {{ordersApiUrl}}/v1/orders/{{transitionOrderId}}
+X-Api-Key: {{apiKey}}
+
+# ── Validation failures ───────────────────────────────────────────────────────
+
+### Zero quantity → 400 Validation Problem
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000001",
+  "currency": "USD",
+  "items": [{ "sku": "BAD-ITEM", "qty": 0, "unit_price_cents": 100 }]
+}
+
+### Missing currency → 400 Validation Problem
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000001",
+  "items": [{ "sku": "ITEM", "qty": 1, "unit_price_cents": 100 }]
+}
+
+### Empty items array → 400 Validation Problem
+POST {{ordersApiUrl}}/v1/orders
+X-Api-Key: {{apiKey}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "00000000-0000-0000-0000-000000000001",
+  "currency": "USD",
+  "items": []
+}
+
+### Payment stub failure simulation (2% natural, or keep re-sending until you see a 402)
+# No special endpoint needed — just send POST /v1/checkout and occasionally hit the 2% rate.
+POST {{checkoutBffUrl}}/v1/checkout
+Authorization: Bearer {{jwtToken}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [{ "sku": "LUCKY-DIP", "qty": 1, "unit_price_cents": 100 }]
+}
+
+# ── Notifier-worker DLQ (requires ENABLE_DLQ=true in docker-compose) ──────────
+
+### Verify DLQ metric — look for notifier_dlq_events_total
+# By default ENABLE_DLQ=false, so this counter stays at 0.
+# Set ENABLE_DLQ=true and break the WEBHOOK_URL to see messages go to orders.events.dlq
+GET {{notifierWorkerUrl}}/metrics

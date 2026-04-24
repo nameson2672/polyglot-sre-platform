@@ -1,0 +1,8 @@
+{
+  "items": [
+    { "sku": "SKU-WIDGET-001", "qty": 2, "unit_price_cents": 1000 },
+    { "sku": "SKU-GADGET-007", "qty": 1, "unit_price_cents": 2500 }
+  ],
+  "payment_method": "card",
+  "currency": "USD"
+}

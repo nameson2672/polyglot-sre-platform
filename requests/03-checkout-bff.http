@@ -1,0 +1,99 @@
+# checkout-bff — all routes
+#
+# Authentication: JWT in Authorization header.
+# The dev token below decodes to { "customer_id": "00000000-0000-0000-0000-000000000001" }.
+# The stub only base64-decodes the payload — no signature verification in dev.
+#
+# For POST /v1/checkout you can skip the JWT and pass customer_id in the body instead.
+
+@checkoutBffUrl = {{$dotenv checkoutBffUrl}}
+@jwtToken       = {{$dotenv jwtToken}}
+@customerId     = {{$dotenv customerId}}
+
+# ── Checkout ──────────────────────────────────────────────────────────────────
+
+### Create checkout — authenticated via JWT
+# Runs payment stub (~300ms, 2% random failure) then calls orders-api.
+# Creates order in Postgres + checkout session in Redis (TTL 1h).
+# @name createCheckout
+POST {{checkoutBffUrl}}/v1/checkout
+Authorization: Bearer {{jwtToken}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [
+    { "sku": "WIDGET-001", "qty": 2, "unit_price_cents": 1999 },
+    { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
+  ]
+}
+
+@checkoutId = {{createCheckout.response.body.$.checkout_id}}
+@orderId    = {{createCheckout.response.body.$.order_id}}
+
+### Create checkout — no JWT, customer_id in body instead
+POST {{checkoutBffUrl}}/v1/checkout
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "customer_id": "{{customerId}}",
+  "currency": "EUR",
+  "items": [
+    { "sku": "EURO-ITEM", "qty": 1, "unit_price_cents": 2500 }
+  ]
+}
+
+### Get checkout session — reads from Redis (should always be fast, no Postgres hit)
+# Send createCheckout above first to populate @checkoutId.
+GET {{checkoutBffUrl}}/v1/checkout/{{checkoutId}}
+
+### Get checkout session — not found → 404
+GET {{checkoutBffUrl}}/v1/checkout/00000000-0000-0000-0000-000000000000
+
+### Confirm checkout session (updates Redis session, does not call orders-api)
+POST {{checkoutBffUrl}}/v1/checkout/{{checkoutId}}/confirm
+Content-Type: application/json
+
+# ── Customer orders ───────────────────────────────────────────────────────────
+
+### List customer orders — first call hits orders-api, caches result for 30s
+# Look for x-cache: MISS in the response headers.
+# @name customerOrdersMiss
+GET {{checkoutBffUrl}}/v1/customer/orders?page=1&size=10
+Authorization: Bearer {{jwtToken}}
+
+### List customer orders — second call within 30s hits Redis cache
+# Look for x-cache: HIT. No orders-api or Postgres call happens.
+GET {{checkoutBffUrl}}/v1/customer/orders?page=1&size=10
+Authorization: Bearer {{jwtToken}}
+
+### List customer orders — different page = different cache key = always a MISS
+GET {{checkoutBffUrl}}/v1/customer/orders?page=2&size=10
+Authorization: Bearer {{jwtToken}}
+
+# ── Auth errors ───────────────────────────────────────────────────────────────
+
+### Missing Idempotency-Key → 400
+POST {{checkoutBffUrl}}/v1/checkout
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [{ "sku": "SKU-1", "qty": 1, "unit_price_cents": 100 }]
+}
+
+### No JWT and no customer_id in body → 401
+POST {{checkoutBffUrl}}/v1/checkout
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "currency": "USD",
+  "items": [{ "sku": "SKU-1", "qty": 1, "unit_price_cents": 100 }]
+}
+
+### Customer orders without JWT → 401
+GET {{checkoutBffUrl}}/v1/customer/orders
