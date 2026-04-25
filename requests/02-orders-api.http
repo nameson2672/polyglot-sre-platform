@@ -25,10 +25,10 @@ Content-Type: application/json
     { "sku": "GADGET-007", "qty": 1, "unit_price_cents": 4999 }
   ]
 }
-
+###
 # Capture the new order id for all requests below.
 # Re-send ↑ first whenever you want a fresh order to work with.
-# @orderId = {{createOrder.response.body.$.id}}
+@orderId = {{createOrder.response.body.$.id}}
 
 ### Idempotency replay — same key, same body → 200 with cached response
 # Change the Idempotency-Key value in createOrder above and re-send to get a fresh key,

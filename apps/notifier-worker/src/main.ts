@@ -33,6 +33,12 @@ export async function main(): Promise<void> {
     shuttingDown = true;
     logger.info('Shutdown signal received');
 
+    const killTimer = setTimeout(() => {
+      logger.error('Shutdown timed out — forcing exit');
+      process.exit(1);
+    }, MAX_SHUTDOWN_MS);
+    killTimer.unref();
+
     // 1. Stop consumer loop
     shutdownController.abort();
 
@@ -63,12 +69,6 @@ export async function main(): Promise<void> {
 
   process.once('SIGTERM', () => { void shutdown(); });
   process.once('SIGINT', () => { void shutdown(); });
-
-  const killTimer = setTimeout(() => {
-    logger.error('Shutdown timed out — forcing exit');
-    process.exit(1);
-  }, MAX_SHUTDOWN_MS);
-  killTimer.unref();
 
   await startConsumer(redis, config.CONSUMER_GROUP, shutdownController.signal);
   await shutdown();
