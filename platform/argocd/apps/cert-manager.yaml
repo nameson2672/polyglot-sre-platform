@@ -4,7 +4,7 @@ metadata:
   name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"   
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -18,9 +18,6 @@ spec:
         crds:
           enabled: true
         replicaCount: 2
-        global:
-          leaderElection:
-            namespace: cert-manager
         prometheus:
           enabled: true
           servicemonitor:
