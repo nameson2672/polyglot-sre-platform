@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"   # same wave as cert-manager, no dependency
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.11.3
+    helm:
+      valuesObject:
+        controller:
+          replicaCount: 2
+          service:
+            type: LoadBalancer
+            annotations:
+              # Hetzner CCM reads this to provision their LB
+              load-balancer.hetzner.cloud/name: "k3s-ingress"
+              load-balancer.hetzner.cloud/location: "fsn1"
+              load-balancer.hetzner.cloud/use-private-ip: "true"
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true      # scraped by Prometheus automatically
+          config:
+            use-forwarded-headers: "true"
+            proxy-real-ip-cidr: "0.0.0.0/0"
+          podAnnotations:
+            # Tells Prometheus to also scrape the controller pod directly
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "10254"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
