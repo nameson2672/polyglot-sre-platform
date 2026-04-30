@@ -27,7 +27,7 @@ spec:
           metrics:
             enabled: true
             serviceMonitor:
-              enabled: true      # scraped by Prometheus automatically
+              enabled: false      # scraped by Prometheus automatically
           config:
             use-forwarded-headers: "true"
             proxy-real-ip-cidr: "0.0.0.0/0"
