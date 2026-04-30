@@ -10,7 +10,9 @@ spec:
   source:
     repoURL: https://github.com/nameson2672/polyglot-sre-platform
     targetRevision: main
-    path: platform/argocd/apps
+    path: platform/argocd
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
