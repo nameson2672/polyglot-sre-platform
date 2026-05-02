@@ -21,17 +21,17 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: argocd.k8s.nameson.me
+    - host: argocd.polyglot.nameson.me
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: argocd-server
+                name: argocd
                 port:
                   number: 80
   tls:
     - hosts:
-        - argocd.k8s.nameson.me
+        - argocd.polyglot.nameson.me
       secretName: argocd-tls
