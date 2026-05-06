@@ -27,3 +27,48 @@ data:
   url: aHR0cHM6Ly9rdWJlcm5ldGVzLmdpdGh1Yi5pby9pbmdyZXNzLW5naW54
   name: aW5ncmVzcy1uZ2lueA==
   type: aGVsbQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-cnpg
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+data:
+  url: aHR0cHM6Ly9jbG91ZG5hdGl2ZS1wZy5naXRodWIuaW8vY2hhcnRz
+  name: Y25wZw==
+  type: aGVsbQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-bitnami
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+data:
+  url: aHR0cHM6Ly9jaGFydHMuYml0bmFtaS5jb20vYml0bmFtaQ==
+  name: Yml0bmFtaQ==
+  type: aGVsbQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-sealed-secrets
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+data:
+  url: aHR0cHM6Ly9iaXRuYW1pLWxhYnMuZ2l0aHViLmlvL3NlYWxlZC1zZWNyZXRz
+  name: c2VhbGVkLXNlY3JldHM=
+  type: aGVsbQ==
