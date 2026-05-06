@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres
+  namespace: dev
+spec:
+  instances: 1
+  storage:
+    size: 2Gi
+    storageClass: local-path
+  bootstrap:
+    initdb:
+      database: ordersdb
+      owner: orders
+      secret:
+        name: postgres-bootstrap-credentials

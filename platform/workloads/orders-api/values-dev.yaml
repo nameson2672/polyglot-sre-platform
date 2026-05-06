@@ -1,0 +1,10 @@
+image:
+  tag: "latest"
+  pullPolicy: Always
+
+secrets:
+  existingSecret: "orders-api-secrets"
+
+env:
+  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_URLS: "http://+:8080"

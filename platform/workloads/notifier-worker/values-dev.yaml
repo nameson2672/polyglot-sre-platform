@@ -1,0 +1,11 @@
+image:
+  tag: "latest"
+  pullPolicy: Always
+
+secrets:
+  existingSecret: "notifier-worker-secrets"
+
+env:
+  CONSUMER_GROUP: "notifier-workers"
+  NOTIFIER_WORKER_PORT: "8082"
+  NODE_ENV: development

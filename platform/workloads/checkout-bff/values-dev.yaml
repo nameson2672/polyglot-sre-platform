@@ -1,0 +1,10 @@
+image:
+  tag: "latest"
+  pullPolicy: Always
+
+secrets:
+  existingSecret: "checkout-bff-secrets"
+
+env:
+  CHECKOUT_BFF_PORT: "8081"
+  NODE_ENV: development
