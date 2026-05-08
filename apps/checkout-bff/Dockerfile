@@ -27,10 +27,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY package.json ./
 
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    APP_ENV=production
 
 EXPOSE 8081
 
 USER nonroot
 
-ENTRYPOINT ["node", "dist/index.js"]
+
+ENTRYPOINT ["/nodejs/bin/node"]
+CMD ["dist/index.js"]

@@ -10,24 +10,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.bitnami.com/bitnami
-    chart: redis
-    targetRevision: "20.x.x"
+    repoURL: https://github.com/nameson2672/polyglot-sre-platform
+    targetRevision: main
+    path: platform/workloads/dev-redis
     helm:
-      valuesObject:
-        architecture: standalone
-        auth:
-          enabled: false
-        master:
-          persistence:
-            enabled: false
-          resources:
-            requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 250m
-              memory: 128Mi
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: dev
