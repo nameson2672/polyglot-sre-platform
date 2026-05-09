@@ -80,7 +80,19 @@ try
         var redisOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RedisOptions>>().Value;
         var url = redisOpts.Url;
         if (url.StartsWith("redis://", StringComparison.OrdinalIgnoreCase))
+        {
             url = url["redis://".Length..];
+            if (url.StartsWith(':'))
+            {
+                var atIdx = url.IndexOf('@');
+                if (atIdx > 0)
+                {
+                    var password = url[1..atIdx];
+                    var hostPort = url[(atIdx + 1)..];
+                    url = $"{hostPort},password={password}";
+                }
+            }
+        }
         return ConnectionMultiplexer.Connect(url);
     });
 
