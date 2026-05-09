@@ -1,6 +1,11 @@
 redis:
   architecture: standalone
 
+  image:
+    registry: docker.io
+    repository: redis
+    tag: "7.4-alpine"
+
   auth:
     enabled: true
     existingSecret: redis-auth
