@@ -31,11 +31,15 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          {{- if .Values.secrets.existingSecret }}
           envFrom:
+            {{- if .Values.secrets.existingSecret }}
             - secretRef:
                 name: {{ .Values.secrets.existingSecret }}
-          {{- end }}
+            {{- end }}
+            {{- if .Values.secrets.redisSecret }}
+            - secretRef:
+                name: {{ .Values.secrets.redisSecret }}
+            {{- end }}
           env:
             {{- range $key, $val := .Values.env }}
             - name: {{ $key }}

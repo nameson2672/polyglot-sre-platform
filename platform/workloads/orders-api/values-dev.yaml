@@ -4,6 +4,7 @@ image:
 
 secrets:
   existingSecret: "orders-api-secrets"
+  redisSecret: "redis-url"
 
 env:
   ASPNETCORE_ENVIRONMENT: Development

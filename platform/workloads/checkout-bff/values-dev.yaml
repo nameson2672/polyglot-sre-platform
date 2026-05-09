@@ -4,6 +4,7 @@ image:
 
 secrets:
   existingSecret: "checkout-bff-secrets"
+  redisSecret: "redis-url"
 
 env:
   CHECKOUT_BFF_PORT: "8081"

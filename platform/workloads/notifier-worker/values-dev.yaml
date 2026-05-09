@@ -4,6 +4,7 @@ image:
 
 secrets:
   existingSecret: "notifier-worker-secrets"
+  redisSecret: "redis-url"
 
 env:
   CONSUMER_GROUP: "notifier-workers"
