@@ -8,7 +8,7 @@
       "applicationUrl": "http://localhost:8080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "POSTGRES_CONNECTION_STRING": "Host=localhost;Port=5432;Database=orders;Username=orders;Password=orders_dev",
+        "POSTGRES_CONNECTION_STRING": "Host=localhost;Port=5432;Database=ordersdb;Username=orders;Password=paassword;SSL Mode=Disable",
         "REDIS_URL": "redis://localhost:6379",
         "ORDERS_API_KEY": "dev-api-key-change-me"
       }
