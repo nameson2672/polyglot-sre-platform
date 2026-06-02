@@ -27,7 +27,7 @@ loadDotenv();
 
 export const config = {
   checkoutBffUrl: process.env['CHECKOUT_BFF_URL'] ?? `http://localhost:${process.env['CHECKOUT_BFF_PORT'] ?? '8081'}`,
-  ordersApiUrl: process.env['ORDERS_API_URL'] ?? `http://localhost:${process.env['ORDERS_API_PORT'] ?? '8080'}`,
+  ordersApiUrl: process.env['ORDERS_API_URL'] ?? `http://localhost:${process.env['ORDERS_API_PORT'] ?? '8083'}`,
   ordersApiKey: process.env['ORDERS_API_KEY'] ?? 'dev-api-key-change-me',
   jwtSecret: process.env['JWT_SECRET'] ?? 'dev-jwt-secret-change-me',
 } as const;

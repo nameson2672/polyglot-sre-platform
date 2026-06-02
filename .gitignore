@@ -111,3 +111,5 @@ temp/
 # Sealed Secrets — plain (unencrypted) secret files must never be committed
 *-plain.yaml
 plain-secret-*.yaml
+
+./apps/orders-api/src/OrdersApi/appsettings.json
