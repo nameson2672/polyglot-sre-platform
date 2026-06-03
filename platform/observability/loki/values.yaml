@@ -1,0 +1,51 @@
+loki:
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: s3
+    bucketNames:
+      chunks: loki-for-polyglot
+      ruler: loki-for-polyglot
+    s3:
+      endpoint: https://fsn1.your-objectstorage.com
+      region: fsn1                                   
+      s3ForcePathStyle: true
+      insecure: false
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  auth_enabled: false
+
+extraEnvFrom:
+  - secretRef:
+      name: loki-s3-credentials
+
+write:
+  replicas: 1
+  persistence:
+    storageClass: local-path
+    size: 10Gi
+
+read:
+  replicas: 1
+
+backend:
+  replicas: 1
+  persistence:
+    storageClass: local-path
+    size: 10Gi
+
+gateway:
+  enabled: true
+
+singleBinary:
+  replicas: 0
+
+minio:
+  enabled: false

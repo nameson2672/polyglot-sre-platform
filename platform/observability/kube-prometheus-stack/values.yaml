@@ -1,15 +1,11 @@
 grafana:
   enabled: true
-  adminPassword: "sadfasd3423%^*"  #TODO: Use sealed secrets or something similar to avoid hardcoding this in plaintext
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: admin-user
+    passwordKey: admin-password
   ingress:
-    enabled: true
-    ingressClassName: nginx
-    hosts:
-      - grafana.polyglot.nameson.me
-    tls:
-      - secretName: grafana-tls
-        hosts:
-          - grafana.polyglot.nameson.me
+    enabled: false
 
 prometheus:
   prometheusSpec:
@@ -17,7 +13,7 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: local-path  
+          storageClassName: local-path
           resources:
             requests:
               storage: 20Gi
@@ -33,6 +29,7 @@ alertmanager:
           resources:
             requests:
               storage: 2Gi
+
 prometheusOperator:
   admissionWebhooks:
     patch:

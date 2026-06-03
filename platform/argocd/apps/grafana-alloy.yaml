@@ -1,21 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kube-prometheus-stack
+  name: grafana-alloy
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "6"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: https://prometheus-community.github.io/helm-charts
-      chart: kube-prometheus-stack
-      targetRevision: "69.x.x"
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: alloy
+      targetRevision: "0.x.x"
       helm:
         valueFiles:
-          - $values/platform/observability/kube-prometheus-stack/values.yaml
+          - $values/platform/observability/grafana-alloy/values.yaml
     - repoURL: https://github.com/nameson2672/polyglot-sre-platform
       targetRevision: main
       ref: values

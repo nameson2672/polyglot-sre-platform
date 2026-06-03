@@ -72,3 +72,18 @@ data:
   url: aHR0cHM6Ly9iaXRuYW1pLWxhYnMuZ2l0aHViLmlvL3NlYWxlZC1zZWNyZXRz
   name: c2VhbGVkLXNlY3JldHM=
   type: aGVsbQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-grafana
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+data:
+  url: aHR0cHM6Ly9ncmFmYW5hLmdpdGh1Yi5pby9oZWxtLWNoYXJ0cw==
+  name: Z3JhZmFuYQ==
+  type: aGVsbQ==
