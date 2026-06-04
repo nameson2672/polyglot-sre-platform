@@ -49,3 +49,15 @@ singleBinary:
 
 minio:
   enabled: false
+
+chunksCache:
+  enabled: true
+  allocatedMemory: 128
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
