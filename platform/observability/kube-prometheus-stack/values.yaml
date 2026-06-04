@@ -13,7 +13,7 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: hcloud-storage
+          storageClassName: hcloud-volumes
           resources:
             requests:
               storage: 20Gi
@@ -25,7 +25,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: hcloud-storage
+          storageClassName: hcloud-volumes
           resources:
             requests:
               storage: 2Gi

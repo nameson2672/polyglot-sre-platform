@@ -29,7 +29,7 @@ extraEnvFrom:
 write:
   replicas: 1
   persistence:
-    storageClass: hcloud-storage
+    storageClass: hcloud-volumes
     size: 10Gi
 
 read:
@@ -38,7 +38,7 @@ read:
 backend:
   replicas: 1
   persistence:
-    storageClass: hcloud-storage
+    storageClass: hcloud-volumes
     size: 10Gi
 
 gateway:
