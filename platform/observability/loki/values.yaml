@@ -8,7 +8,7 @@ loki:
       ruler: loki-for-polyglot
     s3:
       endpoint: https://fsn1.your-objectstorage.com
-      region: fsn1                                   
+      region: fsn1
       s3ForcePathStyle: true
       insecure: false
   schemaConfig:
@@ -29,7 +29,7 @@ extraEnvFrom:
 write:
   replicas: 1
   persistence:
-    storageClass: local-path
+    storageClass: hcloud-storage
     size: 10Gi
 
 read:
@@ -38,7 +38,7 @@ read:
 backend:
   replicas: 1
   persistence:
-    storageClass: local-path
+    storageClass: hcloud-storage
     size: 10Gi
 
 gateway:
