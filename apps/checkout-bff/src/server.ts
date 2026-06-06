@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import underPressure from '@fastify/under-pressure';
+import { trace } from '@opentelemetry/api';
 import { config } from './config.js';
 import { requestIdPlugin } from './plugins/requestId.js';
 import { jwtStubPlugin } from './plugins/jwtStub.js';
@@ -21,6 +22,11 @@ function buildApp() {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
+      base: { service: 'checkout-bff' },
+      mixin() {
+        const ctx = trace.getActiveSpan()?.spanContext();
+        return ctx ? { traceId: ctx.traceId, spanId: ctx.spanId } : {};
+      },
       transport:
         config.APP_ENV === 'dev'
           ? { target: 'pino-pretty', options: { colorize: true } }

@@ -37,3 +37,6 @@ GET {{notifierWorkerUrl}}/info
 
 ### notifier-worker — Prometheus metrics (consumer lag is the primary SLI)
 GET {{notifierWorkerUrl}}/metrics
+
+### Loki — check if it's up and accepting requests
+GET http://localhost:3000/loki/api/v1/label/service_name/values

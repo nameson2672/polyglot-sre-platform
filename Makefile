@@ -49,6 +49,17 @@ dev-down-full: ## Stop all 3 services AND Docker infra
 dev-logs: ## Tail all service logs
 	@tail -F /tmp/polyglot-sre-logs/*.log
 
+obs-up: ## Start LGTM stack — Grafana :3000, Prometheus :9090 (run after make up)
+	docker compose -f docker-compose.monitoring.yml up -d
+	@echo "Grafana:    http://localhost:3000"
+	@echo "Prometheus: http://localhost:9090"
+
+obs-down: ## Stop LGTM stack
+	docker compose -f docker-compose.monitoring.yml down
+
+obs-logs: ## Tail LGTM stack logs
+	docker compose -f docker-compose.monitoring.yml logs -f
+
 smoke: ## Run 10-check E2E smoke test
 	@bash tools/e2e/smoke.sh
 

@@ -1,8 +1,10 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
+import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { readFileSync } from 'node:fs';
@@ -15,17 +17,24 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8')
 };
 
 const resource = new Resource({
-  [ATTR_SERVICE_NAME]: 'notifier-worker',
-  [ATTR_SERVICE_VERSION]: pkg.version,
+  [ATTR_SERVICE_NAME]: process.env['OTEL_SERVICE_NAME'] ?? 'notifier-worker',
+  [ATTR_SERVICE_VERSION]: process.env['npm_package_version'] ?? pkg.version,
 });
+
+const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ?? 'http://localhost:4317';
+
+const traceExporter = new OTLPTraceExporter({ url: otlpEndpoint });
+const metricExporter = new OTLPMetricExporter({ url: otlpEndpoint });
+const logExporter = new OTLPLogExporter({ url: otlpEndpoint });
 
 export const sdk = new NodeSDK({
   resource,
-  traceExporter: new OTLPTraceExporter(),
+  traceExporter,
   metricReader: new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter(),
+    exporter: metricExporter,
     exportIntervalMillis: 10_000,
   }),
+  logRecordProcessor: new SimpleLogRecordProcessor(logExporter),
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-dns': { enabled: false },
@@ -37,8 +46,8 @@ export const sdk = new NodeSDK({
 if (process.env['NODE_ENV'] !== 'test') {
   try {
     sdk.start();
+    console.log('[telemetry] OTel SDK started successfully');
   } catch (err) {
-    // Non-fatal: OTel SDK start failure should not crash the worker
-    process.stderr.write(`OTel SDK start failed: ${String(err)}\n`);
+    console.warn('[telemetry] OTel SDK failed to start, tracing disabled:', err);
   }
 }

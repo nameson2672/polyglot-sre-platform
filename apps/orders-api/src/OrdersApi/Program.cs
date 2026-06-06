@@ -5,6 +5,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Compact;
 using StackExchange.Redis;
 using OrdersApi.Configuration;
 using OrdersApi.Data;
@@ -32,6 +33,7 @@ try
     // Serilog
     builder.Host.UseSerilog((ctx, services, config) =>
     {
+        var endpoint = ctx.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317";
         config
             .ReadFrom.Configuration(ctx.Configuration)
             .ReadFrom.Services(services)
@@ -39,7 +41,17 @@ try
             .Enrich.FromLogContext()
             .Enrich.WithEnvironmentName()
             .Enrich.WithMachineName()
-            .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter());
+            .Enrich.WithProperty("service", "orders-api")
+            .WriteTo.Console(new CompactJsonFormatter())
+            .WriteTo.OpenTelemetry(opts =>
+            {
+                opts.Endpoint = endpoint;
+                opts.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
+                opts.ResourceAttributes = new Dictionary<string, object>
+                {
+                    ["service.name"] = TelemetryConstants.ServiceName,
+                };
+            });
     });
 
     // Options with validation
@@ -111,7 +123,7 @@ try
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddRuntimeInstrumentation()
-            .AddPrometheusExporter());
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)));
 
     // Application services
     builder.Services.AddSingleton<MetricsRegistry>();
@@ -129,14 +141,14 @@ try
 
     var app = builder.Build();
 
-    //TODO Apply EF Core migrations at startup. In production, consider using a dedicated migration strategy instead.
-    using (var scope = app.Services.CreateScope())
-    {
-        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
-        var connStr = db.Database.GetConnectionString();
+    // //TODO Apply EF Core migrations at startup. In production, consider using a dedicated migration strategy instead.
+    // using (var scope = app.Services.CreateScope())
+    // {
+    //     var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+    //     var connStr = db.Database.GetConnectionString();
 
-        db.Database.Migrate();
-    }
+    //     db.Database.Migrate();
+    // }
     app.UseMiddleware<ProblemDetailsMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
 
@@ -146,7 +158,6 @@ try
     });
 
     app.MapOpenApi();
-    app.MapPrometheusScrapingEndpoint("/metrics");
 
     app.MapHealthEndpoints();
     app.MapOrdersEndpoints();

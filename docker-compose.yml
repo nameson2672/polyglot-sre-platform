@@ -64,7 +64,7 @@ services:
       POSTGRES_CONNECTION_STRING: "Host=postgres;Port=5432;Database=orders;Username=orders;Password=orders_dev"
       REDIS_URL: redis://redis:6379
       ORDERS_API_KEY: dev-api-key-change-me
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
     volumes:
       - ./apps/orders-api:/workspace
@@ -107,6 +107,7 @@ services:
       LOG_LEVEL: debug
       APP_ENV: dev
       NODE_OPTIONS: "--inspect=0.0.0.0:9229"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
     volumes:
       - ./apps/checkout-bff:/workspace
       - checkout_bff_node_modules:/workspace/node_modules
@@ -140,7 +141,9 @@ services:
       CONSUMER_GROUP: notifier-workers
       ENABLE_DLQ: "false"
       LOG_LEVEL: debug
+      APP_ENV: dev
       NODE_OPTIONS: "--inspect=0.0.0.0:9230"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
     volumes:
       - ./apps/notifier-worker:/workspace
       - notifier_worker_node_modules:/workspace/node_modules
@@ -167,3 +170,4 @@ volumes:
 networks:
   polyglot-dev:
     driver: bridge
+    name: polyglot-dev
