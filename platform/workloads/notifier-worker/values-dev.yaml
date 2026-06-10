@@ -10,3 +10,7 @@ env:
   CONSUMER_GROUP: "notifier-workers"
   NOTIFIER_WORKER_PORT: "8082"
   NODE_ENV: development
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-alloy.monitoring.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_SERVICE_NAME: "notifier-worker"
+  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"

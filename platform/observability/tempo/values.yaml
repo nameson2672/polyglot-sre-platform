@@ -1,0 +1,41 @@
+# Grafana Tempo — single-binary mode, local PVC storage.
+# Receives traces from grafana-alloy (otelcol.exporter.otlp -> tempo:4317) and
+# serves the query API on :3200 for the Grafana Tempo datasource.
+tempo:
+  retention: 24h
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Only accept OTLP (drop the default jaeger/opencensus listeners we don't use).
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+
+# Persist traces + WAL on a Hetzner volume (same pattern as Loki/Prometheus).
+persistence:
+  enabled: true
+  storageClassName: hcloud-volumes
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+service:
+  type: ClusterIP

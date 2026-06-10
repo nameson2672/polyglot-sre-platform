@@ -9,3 +9,7 @@ secrets:
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: "http://+:8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-alloy.monitoring.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_SERVICE_NAME: "orders-api"
+  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
