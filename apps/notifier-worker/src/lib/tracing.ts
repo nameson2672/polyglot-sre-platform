@@ -9,6 +9,11 @@ import {
 
 const tracer = trace.getTracer('notifier-worker', '0.1.0');
 
+// W3C trace-context id formats. Guards against empty/invalid ids carried by stale
+// outbox events (which would otherwise produce an invalid traceparent like "00---01").
+const TRACE_ID_RE = /^[0-9a-f]{32}$/;
+const SPAN_ID_RE = /^[0-9a-f]{16}$/;
+
 interface EventContext {
   trace_id: string;
   span_id: string;
@@ -18,11 +23,13 @@ interface EventContext {
 }
 
 export function startEventSpan(event: EventContext): { span: Span; ctx: ReturnType<typeof context.active> } {
-  // Build W3C traceparent from event fields so this span is a child of the orders-api trace
-  const traceparent = `00-${event.trace_id}-${event.span_id}-01`;
-  const carrier = { traceparent };
-
-  const parentCtx = propagation.extract(context.active(), carrier);
+  // Link this span to the orders-api trace when the incoming ids are valid;
+  // otherwise start a clean root span.
+  let parentCtx = context.active();
+  if (TRACE_ID_RE.test(event.trace_id) && SPAN_ID_RE.test(event.span_id)) {
+    const carrier = { traceparent: `00-${event.trace_id}-${event.span_id}-01` };
+    parentCtx = propagation.extract(context.active(), carrier);
+  }
 
   const span = tracer.startSpan(
     'notifier.process_event',

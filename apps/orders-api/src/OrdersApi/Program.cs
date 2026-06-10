@@ -117,6 +117,7 @@ try
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddEntityFrameworkCoreInstrumentation()
+            .AddRedisInstrumentation()
             .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
         .WithMetrics(m => m
             .AddMeter(TelemetryConstants.MeterName)

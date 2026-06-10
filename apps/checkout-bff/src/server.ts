@@ -1,9 +1,13 @@
+import os from 'node:os';
 import Fastify from 'fastify';
+import { pino, multistream } from 'pino';
+import prettyFactory from 'pino-pretty';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import underPressure from '@fastify/under-pressure';
-import { trace } from '@opentelemetry/api';
+import { context, trace } from '@opentelemetry/api';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { config } from './config.js';
 import { requestIdPlugin } from './plugins/requestId.js';
 import { jwtStubPlugin } from './plugins/jwtStub.js';
@@ -18,19 +22,81 @@ import { closeRedis } from './lib/cache.js';
 import { sdk } from './telemetry.js';
 import { pool } from './clients/ordersApi.js';
 
+const bffOtelLogger = logs.getLogger('checkout-bff');
+
+const BFF_LABEL_TO_SEVERITY: Record<string, SeverityNumber> = {
+  trace: SeverityNumber.TRACE, debug: SeverityNumber.DEBUG,
+  info: SeverityNumber.INFO, warn: SeverityNumber.WARN,
+  error: SeverityNumber.ERROR, fatal: SeverityNumber.FATAL,
+};
+
+const bffOtelStream = {
+  write(line: string): void {
+    try {
+      const { level, time } = JSON.parse(line) as Record<string, unknown>;
+      const lvl = typeof level === 'string' ? level : 'info';
+      bffOtelLogger.emit({
+        timestamp: typeof time === 'number' ? time : Date.now(),
+        severityNumber: BFF_LABEL_TO_SEVERITY[lvl] ?? SeverityNumber.INFO,
+        severityText: lvl.toUpperCase(),
+        body: line.trimEnd(),
+        context: context.active(),
+      });
+    } catch { /* non-JSON line — ignore */ }
+  },
+};
+
+const bffConsoleStream =
+  config.APP_ENV === 'dev' ? prettyFactory({ colorize: true }) : process.stdout;
+
 function buildApp() {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
-      base: { service: 'checkout-bff' },
+      base: {
+        service: 'checkout-bff',
+        version: config.SERVICE_VERSION,
+        env: config.APP_ENV,
+        hostname: os.hostname(),
+        pid: process.pid,
+      },
+      // Emit the level as a readable label ("info") instead of the numeric code (30).
+      formatters: {
+        level: (label) => ({ level: label }),
+      },
+      // Never let secrets reach the logs.
+      redact: {
+        paths: [
+          'req.headers.authorization',
+          'req.headers["x-api-key"]',
+          '*.password',
+          '*.token',
+        ],
+        censor: '[REDACTED]',
+      },
+      serializers: {
+        req(req) {
+          return {
+            method: req.method,
+            url: req.url,
+            requestId: req.id,
+            remoteAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+          };
+        },
+        res(res) {
+          return { statusCode: res.statusCode };
+        },
+        err: pino.stdSerializers.err,
+      },
       mixin() {
         const ctx = trace.getActiveSpan()?.spanContext();
         return ctx ? { traceId: ctx.traceId, spanId: ctx.spanId } : {};
       },
-      transport:
-        config.APP_ENV === 'dev'
-          ? { target: 'pino-pretty', options: { colorize: true } }
-          : undefined,
+      stream: multistream([
+        { level: config.LOG_LEVEL, stream: bffConsoleStream },
+        { level: config.LOG_LEVEL, stream: bffOtelStream },
+      ]),
     },
     genReqId: () => crypto.randomUUID(),
     disableRequestLogging: false,

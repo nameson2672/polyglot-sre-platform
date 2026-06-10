@@ -11,6 +11,7 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8')
 
 const ConfigSchema = z.object({
   NODE_ENV: z.string().default('development'),
+  APP_ENV: z.string().default('production'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   NOTIFIER_WORKER_PORT: z.coerce.number().default(8082),

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Linq;
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 using Polly.Retry;
@@ -17,6 +19,9 @@ public sealed class OutboxPublisher(
     private static readonly ActivitySource ActivitySource = new(TelemetryConstants.ActivitySourceName);
     private const string StreamName = "orders.events";
     private const long AdvisoryLockId = 12345L;
+
+    // Host of the Redis endpoint, used as the messaging peer (server.address) tag.
+    private readonly string _redisHost = ResolveRedisHost(redis);
 
     private readonly ResiliencePipeline _retryPipeline = new ResiliencePipelineBuilder()
         .AddRetry(new RetryStrategyOptions
@@ -98,6 +103,20 @@ public sealed class OutboxPublisher(
 
             foreach (var msg in messages)
             {
+                // PRODUCER span per event. Tempo's service graph only pairs
+                // PRODUCER↔CONSUMER, so we propagate THIS span's ids (not the INTERNAL
+                // outbox.publish_batch span) to link orders-api → notifier-worker.
+                using var publish = ActivitySource.StartActivity(
+                    $"{StreamName} publish", ActivityKind.Producer);
+                publish?.SetTag("messaging.system", "redis");
+                publish?.SetTag("messaging.destination.name", StreamName);
+                publish?.SetTag("messaging.operation", "publish");
+                publish?.SetTag("server.address", _redisHost);
+                publish?.SetTag("event.id", msg.EventId.ToString());
+
+                var traceId = (publish?.TraceId ?? Activity.Current?.TraceId ?? default).ToString();
+                var spanId = (publish?.SpanId ?? Activity.Current?.SpanId ?? default).ToString();
+
                 try
                 {
                     await _retryPipeline.ExecuteAsync(async token =>
@@ -109,8 +128,8 @@ public sealed class OutboxPublisher(
                             new NameValueEntry("order_id", msg.AggregateId.ToString()),
                             new NameValueEntry("customer_id", ExtractCustomerId(msg.Payload)),
                             new NameValueEntry("occurred_at", msg.CreatedAt.ToString("O")),
-                            new NameValueEntry("trace_id", Activity.Current?.TraceId.ToString() ?? ""),
-                            new NameValueEntry("span_id", Activity.Current?.SpanId.ToString() ?? ""),
+                            new NameValueEntry("trace_id", traceId),
+                            new NameValueEntry("span_id", spanId),
                             new NameValueEntry("payload", msg.Payload)
                         ]);
                     }, ct);
@@ -123,6 +142,7 @@ public sealed class OutboxPublisher(
                 }
                 catch (Exception ex)
                 {
+                    publish?.SetStatus(ActivityStatusCode.Error, ex.Message);
                     logger.LogError(ex, "Failed to publish outbox message {EventId} after retries", msg.EventId);
                 }
             }
@@ -138,6 +158,17 @@ public sealed class OutboxPublisher(
             await db.Database
                 .ExecuteSqlRawAsync($"SELECT pg_advisory_unlock({AdvisoryLockId})", ct);
         }
+    }
+
+    private static string ResolveRedisHost(IConnectionMultiplexer mux)
+    {
+        var ep = mux.GetEndPoints().FirstOrDefault();
+        return ep switch
+        {
+            DnsEndPoint dns => dns.Host,
+            IPEndPoint ip => ip.Address.ToString(),
+            _ => ep?.ToString() ?? "redis",
+        };
     }
 
     private static string ExtractCustomerId(string payload)

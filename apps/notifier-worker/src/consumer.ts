@@ -82,7 +82,7 @@ export async function startConsumer(
         const parsed = EventSchema.safeParse(fields);
         if (!parsed.success) {
           logger.error(
-            { message_id: messageId, error: parsed.error.message },
+            { message_id: messageId, validation_errors: parsed.error.issues },
             'Invalid event schema — discarding',
           );
           eventsConsumedTotal.inc({ event_type: 'unknown', status: 'invalid' });

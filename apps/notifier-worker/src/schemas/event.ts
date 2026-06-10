@@ -2,10 +2,12 @@ import { z } from 'zod';
 
 export const EventSchema = z.object({
   event_id: z.string().uuid(),
-  event_type: z.enum(['order.confirmed', 'order.cancelled', 'order.shipped']),
+  event_type: z.enum(['order.created', 'order.confirmed', 'order.cancelled', 'order.shipped']),
   order_id: z.string().uuid(),
   customer_id: z.string().uuid(),
-  occurred_at: z.string().datetime(),
+  // orders-api emits DateTimeOffset.ToString("O") which carries a +00:00 offset,
+  // so offsets must be permitted (zod rejects them by default).
+  occurred_at: z.string().datetime({ offset: true }),
   trace_id: z.string(),
   span_id: z.string(),
   // CHAOS: JSON.parse is synchronous; large payloads block the event loop

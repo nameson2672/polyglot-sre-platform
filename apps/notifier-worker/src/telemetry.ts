@@ -4,7 +4,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
-import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { readFileSync } from 'node:fs';
@@ -34,11 +34,14 @@ export const sdk = new NodeSDK({
     exporter: metricExporter,
     exportIntervalMillis: 10_000,
   }),
-  logRecordProcessor: new SimpleLogRecordProcessor(logExporter),
+  logRecordProcessor: new BatchLogRecordProcessor(logExporter),
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-dns': { enabled: false },
       '@opentelemetry/instrumentation-net': { enabled: false },
+      // Logs are bridged explicitly in lib/logger.ts (top-level ESM pino import is
+      // never patched by this instrumentation), so disable it to avoid double-emit.
+      '@opentelemetry/instrumentation-pino': { enabled: false },
     }),
   ],
 });
@@ -46,7 +49,6 @@ export const sdk = new NodeSDK({
 if (process.env['NODE_ENV'] !== 'test') {
   try {
     sdk.start();
-    console.log('[telemetry] OTel SDK started successfully');
   } catch (err) {
     console.warn('[telemetry] OTel SDK failed to start, tracing disabled:', err);
   }
