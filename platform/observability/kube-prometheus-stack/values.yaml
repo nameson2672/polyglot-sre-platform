@@ -6,10 +6,41 @@ grafana:
     passwordKey: admin-password
   ingress:
     enabled: false
+  # Loki + Tempo datasources with trace<->log correlation (the Prometheus datasource
+  # is provisioned by the chart by default).
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      jsonData:
+        # log -> trace: click the traceId in a log line to open the Tempo trace.
+        derivedFields:
+          - name: traceId
+            matcherType: regex
+            matcherRegex: '"?trace_?[Ii]d"?[:=]"?(\w+)'
+            url: '$${__value.raw}'
+            datasourceUid: tempo
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc.cluster.local:3200
+      jsonData:
+        # trace -> log: from a span, jump to the matching logs in Loki by trace id.
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: '-5m'
+          spanEndTimeShift: '5m'
+          filterByTraceID: true
+          filterBySpanID: false
 
 prometheus:
   prometheusSpec:
     retention: 15d
+    # Accept remote-write from Alloy (app OTLP metrics fan out to here).
+    enableRemoteWriteReceiver: true
     storageSpec:
       volumeClaimTemplate:
         spec:

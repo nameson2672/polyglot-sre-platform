@@ -1,4 +1,17 @@
 alloy:
+  # Expose the OTLP receiver ports on the Alloy container + Service so workloads in
+  # the `dev` namespace can reach grafana-alloy.monitoring.svc.cluster.local:4317.
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+      appProtocol: h2c
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+
   configMap:
     content: |
       logging {
@@ -6,6 +19,9 @@ alloy:
         format = "logfmt"
       }
 
+      // ------------------------------------------------------------------
+      // Pod stdout log scraping -> Loki (whole-cluster coverage)
+      // ------------------------------------------------------------------
       discovery.kubernetes "pods" {
         role = "pod"
       }
@@ -39,6 +55,13 @@ alloy:
           source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_label_app_kubernetes_io_name"]
           target_label  = "app"
         }
+        // The instrumented apps ship richer, trace-correlated logs over OTLP, so drop
+        // their stdout streams here to avoid duplicate log lines in Loki.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          regex         = "orders-api|checkout-bff|notifier-worker"
+          action        = "drop"
+        }
       }
 
       loki.source.kubernetes "pod_logs" {
@@ -49,6 +72,57 @@ alloy:
       loki.write "default" {
         endpoint {
           url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+      // ------------------------------------------------------------------
+      // OTLP receiver for app traces / metrics / logs (replaces otel-lgtm)
+      // ------------------------------------------------------------------
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+        output {
+          traces  = [otelcol.processor.batch.default.input]
+          logs    = [otelcol.processor.batch.default.input]
+          metrics = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      otelcol.processor.batch "default" {
+        output {
+          traces  = [otelcol.exporter.otlp.tempo.input]
+          logs    = [otelcol.exporter.loki.default.input]
+          metrics = [otelcol.exporter.prometheus.default.input]
+        }
+      }
+
+      // Traces -> Tempo
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring.svc.cluster.local:4317"
+          tls {
+            insecure = true
+          }
+        }
+      }
+
+      // OTLP logs -> Loki (carries service.name + traceId for trace<->log linking)
+      otelcol.exporter.loki "default" {
+        forward_to = [loki.write.default.receiver]
+      }
+
+      // OTLP metrics -> Prometheus remote-write
+      otelcol.exporter.prometheus "default" {
+        forward_to = [prometheus.remote_write.default.receiver]
+      }
+
+      prometheus.remote_write "default" {
+        endpoint {
+          url = "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
         }
       }
 
