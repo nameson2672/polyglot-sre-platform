@@ -22,9 +22,14 @@ loki:
           period: 24h
   auth_enabled: false
 
-extraEnvFrom:
-  - secretRef:
-      name: loki-s3-credentials
+# The S3 (Hetzner object storage) credentials must be injected into EVERY Loki
+# component (read/write/backend). In the grafana/loki chart that is done via
+# `global.extraEnvFrom` — a top-level `extraEnvFrom:` key is silently ignored, which
+# left Loki with no credentials (it fell back to EC2 IMDS and could not flush chunks).
+global:
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-credentials
 
 write:
   replicas: 1

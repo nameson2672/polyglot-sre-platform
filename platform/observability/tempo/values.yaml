@@ -4,13 +4,18 @@
 tempo:
   retention: 24h
 
+  # The chart defaults memBallastSizeMbs to 1024 (a 1 GB ballast). With a 512Mi limit
+  # that guaranteed an OOMKill (exit 137) the moment a search ran. Drop the ballast and
+  # give Tempo enough headroom to serve TraceQL search.
+  memBallastSizeMbs: 0
+
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: "1"
+      memory: 1Gi
 
   # Only accept OTLP (drop the default jaeger/opencensus listeners we don't use).
   receivers:
