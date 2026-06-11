@@ -1,5 +1,5 @@
 image:
-  tag: "sha-c7d212a"
+  tag: "sha-99bdb77"
   pullPolicy: IfNotPresent
 secrets:
   existingSecret: "checkout-bff-secrets"
