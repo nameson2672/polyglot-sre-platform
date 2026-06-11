@@ -308,6 +308,32 @@ Cloudflare is used for DNS and proxying public traffic. Config lives in
 
 ---
 
+## CI/CD (GitHub Actions → GitOps)
+
+The `.github/workflows/build-and-bump.yml` workflow automates image delivery for the three
+app services (`orders-api`, `checkout-bff`, `notifier-worker`).
+
+On every push to `main` that touches `apps/<service>/**` it:
+
+1. **Detects** which service(s) changed (`dorny/paths-filter`).
+2. **Builds + pushes** only those images to `ghcr.io/nameson2672/<service>`, tagged with the
+   immutable git short-SHA (`sha-<short>`) plus `:latest`.
+3. **Opens a PR** (`ci/image-bump-<short>`) that bumps `image.tag` in the matching
+   `platform/workloads/<service>/values-dev.yaml`.
+
+You review and merge that PR; ArgoCD (which tracks `main`) then rolls out the new image.
+Because the tag is immutable, no `kubectl rollout restart` is needed.
+
+**No build loop:** the build only triggers on `apps/**`, while the bump PR only changes
+`platform/workloads/**`, so merging it never re-runs the build.
+
+**One-time repo setting:** Settings → Actions → General → Workflow permissions → enable
+"Read and write permissions" **and** "Allow GitHub Actions to create and approve pull
+requests" (required for the bump PR). No extra secrets are needed — the workflow uses the
+built-in `GITHUB_TOKEN`.
+
+---
+
 ## Troubleshooting
 
 ### orders-api takes a long time to start
