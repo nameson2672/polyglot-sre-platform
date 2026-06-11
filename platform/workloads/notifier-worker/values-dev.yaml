@@ -1,11 +1,9 @@
 image:
-  tag: "latest"
+  tag: "sha-c7d212a"
   pullPolicy: IfNotPresent
-
 secrets:
   existingSecret: "notifier-worker-secrets"
   redisSecret: "redis-url"
-
 env:
   CONSUMER_GROUP: "notifier-workers"
   NOTIFIER_WORKER_PORT: "8082"
