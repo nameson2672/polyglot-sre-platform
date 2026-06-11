@@ -1,9 +1,9 @@
-FROM node:22-bookworm-slim AS deps
+FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -11,7 +11,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npx tsc --project tsconfig.json
 
-FROM gcr.io/distroless/nodejs22-debian12:nonroot AS runtime
+FROM gcr.io/distroless/nodejs24-debian12:nonroot AS runtime
 WORKDIR /app
 COPY --from=deps --chown=nonroot:nonroot /app/node_modules ./node_modules
 COPY --from=build --chown=nonroot:nonroot /app/dist ./dist
