@@ -1,7 +1,6 @@
 import os from 'node:os';
 import Fastify from 'fastify';
 import { pino, multistream } from 'pino';
-import prettyFactory from 'pino-pretty';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
@@ -46,8 +45,13 @@ const bffOtelStream = {
   },
 };
 
+// pino-pretty is a devDependency and is absent from the production image
+// (npm ci --omit=dev). Load it lazily so it is only required in dev; in
+// production (APP_ENV !== 'dev') logs are plain JSON to stdout.
 const bffConsoleStream =
-  config.APP_ENV === 'dev' ? prettyFactory({ colorize: true }) : process.stdout;
+  config.APP_ENV === 'dev'
+    ? (await import('pino-pretty')).default({ colorize: true })
+    : process.stdout;
 
 function buildApp() {
   const app = Fastify({
