@@ -1,6 +1,6 @@
 image:
   tag: "latest"
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 secrets:
   existingSecret: "notifier-worker-secrets"

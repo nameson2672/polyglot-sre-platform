@@ -1,0 +1,120 @@
+name: build-and-bump
+
+# Build the changed service image(s), push to GHCR with an immutable git-SHA tag,
+# then open a PR that bumps image.tag in the matching values-dev.yaml so ArgoCD
+# (which tracks main) deploys the new image once the PR is merged.
+#
+# No build loop: this workflow only triggers on changes under apps/**, while the
+# bump PR only touches platform/workloads/** — merging it never re-runs the build.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/orders-api/**'
+      - 'apps/checkout-bff/**'
+      - 'apps/notifier-worker/**'
+
+concurrency:
+  group: build-and-bump-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: nameson2672
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            orders-api:
+              - 'apps/orders-api/**'
+            checkout-bff:
+              - 'apps/checkout-bff/**'
+            notifier-worker:
+              - 'apps/notifier-worker/**'
+
+  build:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: vars
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.service }}
+          file: apps/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.service }}:sha-${{ steps.vars.outputs.short }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  bump:
+    needs: [detect, build]
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: vars
+        run: |
+          echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "list=$(echo '${{ needs.detect.outputs.services }}' | jq -r 'join(", ")')" >> "$GITHUB_OUTPUT"
+
+      - name: Bump image.tag in values-dev.yaml
+        run: |
+          for svc in $(echo '${{ needs.detect.outputs.services }}' | jq -r '.[]'); do
+            yq -i ".image.tag = \"sha-${{ steps.vars.outputs.short }}\"" "platform/workloads/$svc/values-dev.yaml"
+            echo "bumped $svc -> sha-${{ steps.vars.outputs.short }}"
+          done
+
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: ci/image-bump-${{ steps.vars.outputs.short }}
+          delete-branch: true
+          commit-message: "ci: bump ${{ steps.vars.outputs.list }} image to sha-${{ steps.vars.outputs.short }}"
+          title: "ci: deploy ${{ steps.vars.outputs.list }} → sha-${{ steps.vars.outputs.short }}"
+          labels: |
+            image-bump
+            automated
+          body: |
+            Automated image bump from commit ${{ github.sha }}.
+
+            Updated `image.tag` → `sha-${{ steps.vars.outputs.short }}` for: **${{ steps.vars.outputs.list }}**
+
+            Merging this PR deploys the new image(s) via ArgoCD (tracks `main`).
