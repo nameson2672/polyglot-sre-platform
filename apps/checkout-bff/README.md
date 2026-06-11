@@ -1,4 +1,4 @@
-# checkout-bff
+# checkout-bff 
 
 Backend-for-Frontend service that orchestrates checkout flows for the polyglot SRE platform. Wraps `orders-api` with payment stubbing, Redis caching, JWT identity extraction, Prometheus metrics, and OpenTelemetry tracing.
 

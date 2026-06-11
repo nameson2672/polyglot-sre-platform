@@ -1,4 +1,4 @@
-# notifier-worker
+# notifier-worker 
 
 TypeScript background worker that consumes the `orders.events` Redis Stream and dispatches webhook notifications. Exposes a Fastify sidecar on port 8082 for Kubernetes health probes and Prometheus scraping.
 

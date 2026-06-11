@@ -1,4 +1,4 @@
-# orders-api
+# orders-api.
 
 .NET 10 Minimal API service that owns the `Order` aggregate. Persists to Postgres, publishes domain events via a transactional outbox to a Redis Stream (`orders.events`).
 
