@@ -9,6 +9,11 @@ services:
       - "9090:9090"   # Prometheus query
     volumes:
       - otel_lgtm_data:/data
+      # Scrape app /metrics into the bundled Prometheus (custom prom-client metrics)
+      - ./platform/observability/local/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro
+      # Auto-provision dashboards from repo JSON into the "Polyglot" folder
+      - ./platform/observability/dashboards/provider.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/polyglot.yaml:ro
+      - ./platform/observability/dashboards/json:/var/lib/grafana/dashboards/polyglot:ro
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin

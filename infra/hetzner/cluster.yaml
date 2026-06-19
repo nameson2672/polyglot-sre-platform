@@ -1,7 +1,7 @@
 cluster_name: "hetzner-k3s-cluster"
 kubeconfig_path: "./kubeconfig"
 k3s_version: v1.32.0+k3s1
-
+protect_against_deletion: false
 networking:
   ssh:
     port: 22
@@ -33,7 +33,7 @@ schedule_workloads_on_masters: false
 
 worker_node_pools:
   - name: workers
-    instance_type: cx23       # 2 vCPU, 8 GB RAM
+    instance_type: cpx42       # 2 vCPU, 8 GB RAM
     instance_count: 1
     location: fsn1
 
