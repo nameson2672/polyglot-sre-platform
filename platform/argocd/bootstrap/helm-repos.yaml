@@ -61,7 +61,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: repo-sealed-secrets
+  name: repo-external-secrets
   namespace: argocd
   labels:
     argocd.argoproj.io/secret-type: repository
@@ -69,8 +69,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 type: Opaque
 data:
-  url: aHR0cHM6Ly9iaXRuYW1pLWxhYnMuZ2l0aHViLmlvL3NlYWxlZC1zZWNyZXRz
-  name: c2VhbGVkLXNlY3JldHM=
+  url: aHR0cHM6Ly9jaGFydHMuZXh0ZXJuYWwtc2VjcmV0cy5pbw==
+  name: ZXh0ZXJuYWwtc2VjcmV0cw==
   type: aGVsbQ==
 ---
 apiVersion: v1

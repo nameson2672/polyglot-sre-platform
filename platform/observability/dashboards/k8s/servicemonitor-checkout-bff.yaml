@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: checkout-bff
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus selects all ServiceMonitors; this label
+    # keeps ownership obvious.
+    release: kube-prometheus-stack
+spec:
+  # The checkout-bff Service lives in the dev namespace.
+  namespaceSelector:
+    matchNames: ["dev"]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: checkout-bff
+  endpoints:
+    # /metrics is served on the same "http" port the Service exposes (8081).
+    - port: http
+      path: /metrics
+      interval: 15s
+      relabelings:
+        # Mirror the local static service_name label so dashboard panels that group
+        # by (service_name) stay consistent with OTLP-sourced series.
+        - targetLabel: service_name
+          replacement: checkout-bff
