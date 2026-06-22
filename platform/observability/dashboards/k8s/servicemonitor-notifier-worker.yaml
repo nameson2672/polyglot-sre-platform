@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notifier-worker
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  # The notifier-worker Service lives in the dev namespace.
+  namespaceSelector:
+    matchNames: ["dev"]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notifier-worker
+  endpoints:
+    # /metrics is served on the same "http" port the Service exposes (8082).
+    - port: http
+      path: /metrics
+      interval: 15s
+      relabelings:
+        - targetLabel: service_name
+          replacement: notifier-worker

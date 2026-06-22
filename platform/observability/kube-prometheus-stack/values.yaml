@@ -6,6 +6,16 @@ grafana:
     passwordKey: admin-password
   ingress:
     enabled: false
+  # Dashboard sidecar: import any ConfigMap labeled grafana_dashboard=1 (in the
+  # monitoring namespace). folderAnnotation + foldersFromFilesStructure let our
+  # ConfigMap's grafana_folder annotation place the dashboard in a "Polyglot" folder.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
   # Loki + Tempo datasources with trace<->log correlation (the Prometheus datasource
   # is provisioned by the chart by default).
   additionalDataSources:
