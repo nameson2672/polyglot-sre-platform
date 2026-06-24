@@ -1,0 +1,16 @@
+---
+# Grafana dashboard provider for the local otel-lgtm stack.
+# Mounted into the container at
+#   /otel-lgtm/grafana/conf/provisioning/dashboards/polyglot.yaml
+# It loads every *.json under the mounted dashboards directory into a "Polyglot"
+# folder. The same JSON files are reused later for the k8s/ArgoCD Grafana.
+apiVersion: 1
+
+providers:
+  - name: polyglot
+    type: file
+    folder: Polyglot
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/polyglot
+      foldersFromFilesStructure: false

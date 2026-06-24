@@ -1,11 +1,9 @@
 image:
-  tag: "latest"
+  tag: "sha-c7d212a"
   pullPolicy: IfNotPresent
-
 secrets:
   existingSecret: "orders-api-secrets"
   redisSecret: "redis-url"
-
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: "http://+:8080"

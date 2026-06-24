@@ -1,6 +1,5 @@
 import os from 'node:os';
 import { pino, multistream } from 'pino';
-import prettyFactory from 'pino-pretty';
 import { trace, context } from '@opentelemetry/api';
 import { logs, SeverityNumber, type AnyValueMap } from '@opentelemetry/api-logs';
 import { config, consumerId, serviceVersion } from '../config.js';
@@ -64,8 +63,13 @@ const otelStream = {
   },
 };
 
+// pino-pretty is a devDependency and is absent from the production image
+// (npm ci --omit=dev). Load it lazily so it is only required in dev, where
+// APP_ENV === 'dev'; production logs as plain JSON to stdout.
 const consoleStream =
-  config.APP_ENV === 'dev' ? prettyFactory({ colorize: true }) : process.stdout;
+  config.APP_ENV === 'dev'
+    ? (await import('pino-pretty')).default({ colorize: true })
+    : process.stdout;
 
 export const logger = pino(
   {

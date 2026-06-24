@@ -1,11 +1,9 @@
 image:
-  tag: "latest"
+  tag: "sha-99bdb77"
   pullPolicy: IfNotPresent
-
 secrets:
   existingSecret: "checkout-bff-secrets"
   redisSecret: "redis-url"
-
 env:
   CHECKOUT_BFF_PORT: "8081"
   NODE_ENV: development
