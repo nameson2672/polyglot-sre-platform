@@ -18,7 +18,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
-
+CONFIG="infra/hetzner/cluster.yaml"
 ARGOCD_VERSION="${ARGOCD_VERSION:-stable}"
 
 # ── Load credentials ─────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ fi
 # ── 1. Provision cluster ─────────────────────────────────────────────────────
 echo "==> Creating Hetzner k3s cluster..."
 HCLOUD_TOKEN="$(security find-generic-password -s HCLOUD_TOKEN -w | tr -d '\n\r')" \
-hetzner-k3s create --config infra/hetzner/cluster.yaml
+hetzner-k3s create --config "$CONFIG"
 export KUBECONFIG="${REPO_ROOT}/kubeconfig"
 
 echo "==> Waiting for the API server to respond..."

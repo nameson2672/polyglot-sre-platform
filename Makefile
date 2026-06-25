@@ -3,7 +3,7 @@
 .PHONY: help up down logs ps psql redis-cli reset-db clean \
         dev-up dev-down dev-down-full dev-logs \
         smoke traffic-steady traffic-spike traffic-mixed traffic-chaos e2e-full \
-        cluster-up
+        cluster-up cluster-down
 
 help: ## List all available targets with comments
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +40,9 @@ clean: ## Remove node_modules, bin, obj directories
 
 cluster-up: ## Provision a fresh Hetzner k3s cluster + bootstrap Argo CD/ESO/Infisical
 	@bash scripts/cluster-up.sh
+
+cluster-down: ## Tear down the Hetzner k3s cluster + release LBs/volumes (FORCE=1 to skip prompt)
+	@bash scripts/cluster-down.sh
 
 dev-up: ## Start infra + all 3 services locally (tmux if available, else background)
 	@bash scripts/dev-up.sh
