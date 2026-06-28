@@ -184,7 +184,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "editorMode": "code",
-          "expr": "count(count by (service_name) (target_info{service_name=~\"checkout-bff|orders-api|notifier-worker\"}))",
+          "expr": "count(count by (service_name) (target_info{service_name=~\"$service\"}))",
           "instant": true,
           "refId": "A"
         }

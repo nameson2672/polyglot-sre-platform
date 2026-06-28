@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using OpenTelemetry.Trace;
 
 namespace OrdersApi.Middleware;
 
@@ -13,6 +15,12 @@ public sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Probl
         }
         catch (Exception ex)
         {
+            // Mark the ASP.NET server span as errored so the failing request shows red
+            // in Tempo and the stack trace is attached as an "exception" span event.
+            var activity = Activity.Current;
+            activity?.RecordException(ex);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+
             logger.LogError(ex, "Unhandled exception at {Path}", context.Request.Path);
 
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;

@@ -336,6 +336,10 @@ built-in `GITHUB_TOKEN`.
 
 ## Troubleshooting
 
+> Seeing 500s and not sure which request/service is at fault? Follow
+> [docs/debugging-requests.md](docs/debugging-requests.md) — spot the 5xx in Prometheus,
+> find the failing trace in Tempo (`{ status = error }`), and jump to the correlated logs.
+
 ### orders-api takes a long time to start
 
 Cold start downloads NuGet packages — allow up to 90 seconds. Check:
