@@ -1,5 +1,5 @@
 image:
-  tag: "sha-0750573"
+  tag: "sha-7fb59a2"
   pullPolicy: IfNotPresent
 secrets:
   existingSecret: "notifier-worker-secrets"
