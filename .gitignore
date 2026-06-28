@@ -101,8 +101,7 @@ dist/
 .next/
 out/
 
-# Docker
-.dockerignore
+
 
 # Temporary files
 tmp/
@@ -112,4 +111,5 @@ temp/
 *-plain.yaml
 plain-secret-*.yaml
 
-./apps/orders-api/src/OrdersApi/appsettings.json
+*appsettings.json
+apps/orders-api/src/OrdersApi/appsettings.json

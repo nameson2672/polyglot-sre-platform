@@ -1,0 +1,24 @@
+# docker-compose.build.yml
+# Build & run the PRODUCTION image of orders-api (respects .dockerignore),
+# instead of the bind-mount SDK debug service in docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build orders-api
+#
+# Requires Docker Compose v2.24.0+ for the !reset / !override merge tags.
+services:
+  orders-api:
+    build:
+      context: ./apps/orders-api
+      dockerfile: Dockerfile
+    image: orders-api:local
+    # Use the image ENTRYPOINT (`dotnet OrdersApi.dll`) in its own WORKDIR (/app),
+    # not the SDK `dotnet run` from /workspace.
+    command: !reset null
+    working_dir: !reset null
+    # Drop debug-only mounts so we exercise the real image (no source, no vsdbg, no nuget cache).
+    volumes: !override []
+    cap_add: !override []
+    security_opt: !override []
+    # The alpine runtime image has no curl/wget; the base healthcheck would false-fail.
+    healthcheck: !reset null
