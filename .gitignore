@@ -113,3 +113,10 @@ plain-secret-*.yaml
 
 *appsettings.json
 apps/orders-api/src/OrdersApi/appsettings.json
+# Local observability stack: generated Pyrra rules + real alerting secrets (keep .example)
+platform/observability/local/pyrra-rules/*
+!platform/observability/local/pyrra-rules/.gitkeep
+platform/observability/local/secrets/*
+!platform/observability/local/secrets/*.example
+
+./apps/orders-api/src/OrdersApi/appsettings.json

@@ -14,9 +14,54 @@ services:
       # Auto-provision dashboards from repo JSON into the "Polyglot" folder
       - ./platform/observability/dashboards/provider.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/polyglot.yaml:ro
       - ./platform/observability/dashboards/json:/var/lib/grafana/dashboards/polyglot:ro
+      # Pyrra-generated recording + burn-rate alerting rules (written by the pyrra service).
+      # Read via rule_files in prometheus.yaml. Prometheus loads rule files at startup, so after
+      # pyrra (re)generates them run: docker compose -f docker-compose.monitoring.yml restart otel-lgtm
+      - ./platform/observability/local/pyrra-rules:/etc/prometheus/pyrra:ro
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    networks:
+      - polyglot-dev
+
+  # Local analogue of the in-cluster `pyrra kubernetes` operator. Filesystem mode reads the
+  # same ServiceLevelObjective manifests and renders vanilla Prometheus recording + multi-window
+  # burn-rate alerting rules into ./platform/observability/local/pyrra-rules.
+  pyrra:
+    image: ghcr.io/pyrra-dev/pyrra:v0.10.1
+    container_name: polyglot-pyrra
+    command:
+      - filesystem
+      - --config-files=/etc/pyrra/slos/*.yaml
+      - --prometheus-url=http://otel-lgtm:9090
+      - --prometheus-folder=/etc/pyrra/rules
+      - --generic-rules
+    ports:
+      - "9444:9444"   # Pyrra filesystem backend API (the web UI is the separate in-cluster pyrra-api component)
+    volumes:
+      - ./platform/observability/slo/definitions:/etc/pyrra/slos:ro
+      # Host bind mount (not a named volume): on Docker Desktop it stays writable for the
+      # distroless non-root user, and otel-lgtm reads the same files back read-only.
+      - ./platform/observability/local/pyrra-rules:/etc/pyrra/rules
+    networks:
+      - polyglot-dev
+
+  # Local Alertmanager so the full burn-rate -> routing -> Slack/PagerDuty path is testable.
+  # Slack webhook + PagerDuty routing key are read from gitignored files under local/secrets/
+  # (copy the *.example files and fill in real/test values). Routing correctness can be checked
+  # without real secrets via: amtool config routes test --config.file=local/alertmanager.yml ...
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: polyglot-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./platform/observability/local/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./platform/observability/local/secrets:/etc/alertmanager/secrets:ro
+      - alertmanager_data:/alertmanager
     networks:
       - polyglot-dev
 
@@ -27,3 +72,4 @@ networks:
 
 volumes:
   otel_lgtm_data:
+  alertmanager_data:
