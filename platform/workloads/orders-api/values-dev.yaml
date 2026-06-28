@@ -1,5 +1,5 @@
 image:
-  tag: "sha-0750573"
+  tag: "sha-2b48f78"
   pullPolicy: IfNotPresent
 secrets:
   existingSecret: "orders-api-secrets"
