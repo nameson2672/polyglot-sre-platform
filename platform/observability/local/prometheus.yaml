@@ -47,6 +47,17 @@ storage:
     # A 10min time window is enough because it can easily absorb retries and network delays.
     out_of_order_time_window: 10m
 
+# Pyrra (filesystem mode) renders SLO recording + multi-window burn-rate alerting rules into
+# the shared pyrra-rules volume. Loaded at startup — restart otel-lgtm after they're generated.
+rule_files:
+  - /etc/prometheus/pyrra/*.yaml
+
+# Send firing alerts (Pyrra ErrorBudgetBurn) to the local Alertmanager for routing validation.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 # Local analogue of a k8s ServiceMonitor/PodMonitor: scrape the apps' /metrics.
 # Targets use the running container names, resolvable on the shared polyglot-dev
 # network. service_name is attached as a static label so scraped series filter

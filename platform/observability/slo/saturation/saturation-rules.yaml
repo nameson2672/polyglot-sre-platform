@@ -1,0 +1,58 @@
+# Saturation alerts are intentionally NOT Pyrra SLOs: CPU/memory utilisation does
+# not map onto an error-budget / burn-rate model. They are plain threshold alerts.
+#
+# These rules use cAdvisor (container_*) and kube-state-metrics (kube_pod_*) series
+# that only exist in-cluster, so they are validated in the cluster, not in the local
+# otel-lgtm stack (which has no cAdvisor/KSM).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: polyglot-saturation
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: polyglot-sre-platform
+    # Selected by the kube-prometheus-stack Prometheus.
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: polyglot-saturation-cpu
+      rules:
+        - alert: PolyglotCPUSaturation
+          expr: |
+            sum by (namespace, pod) (
+              rate(container_cpu_usage_seconds_total{namespace="dev", pod=~"orders-api.*|checkout-bff.*|notifier-worker.*", container!="", image!=""}[5m])
+            )
+            /
+            sum by (namespace, pod) (
+              kube_pod_container_resource_limits{namespace="dev", pod=~"orders-api.*|checkout-bff.*|notifier-worker.*", resource="cpu"}
+            )
+            > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            kind: saturation
+            resource: cpu
+          annotations:
+            summary: "High CPU saturation on {{ $labels.pod }}"
+            description: "{{ $labels.pod }} ({{ $labels.namespace }}) has used >85% of its CPU limit for 10m (current {{ $value | humanizePercentage }})."
+
+    - name: polyglot-saturation-memory
+      rules:
+        - alert: PolyglotMemorySaturation
+          expr: |
+            sum by (namespace, pod) (
+              container_memory_working_set_bytes{namespace="dev", pod=~"orders-api.*|checkout-bff.*|notifier-worker.*", container!="", image!=""}
+            )
+            /
+            sum by (namespace, pod) (
+              kube_pod_container_resource_limits{namespace="dev", pod=~"orders-api.*|checkout-bff.*|notifier-worker.*", resource="memory"}
+            )
+            > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            kind: saturation
+            resource: memory
+          annotations:
+            summary: "High memory saturation on {{ $labels.pod }}"
+            description: "{{ $labels.pod }} ({{ $labels.namespace }}) working set is >85% of its memory limit for 10m (current {{ $value | humanizePercentage }})."

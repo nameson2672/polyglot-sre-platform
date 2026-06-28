@@ -1,0 +1,22 @@
+apiVersion: pyrra.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: notifier-worker-latency
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: notifier-worker
+    app.kubernetes.io/part-of: polyglot-sre-platform
+    pyrra.dev/team: platform
+    release: kube-prometheus-stack
+spec:
+  # notifier-worker is a queue consumer, not an HTTP service: "latency" here is
+  # end-to-end event processing duration, not request latency.
+  description: 95% of events are processed in under 500ms (p95 < 500ms).
+  target: "95"
+  window: 4w
+  indicator:
+    latency:
+      success:
+        metric: notifier_event_processing_duration_seconds_bucket{job="notifier-worker",le="0.5"}
+      total:
+        metric: notifier_event_processing_duration_seconds_count{job="notifier-worker"}

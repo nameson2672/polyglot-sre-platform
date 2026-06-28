@@ -1,0 +1,20 @@
+apiVersion: pyrra.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: orders-api-availability
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: orders-api
+    app.kubernetes.io/part-of: polyglot-sre-platform
+    pyrra.dev/team: platform
+    release: kube-prometheus-stack
+spec:
+  description: 99.5% of orders-api HTTP requests succeed (non-5xx).
+  target: "99.5"
+  window: 4w
+  indicator:
+    ratio:
+      errors:
+        metric: http_server_request_duration_seconds_count{job="orders-api",http_response_status_code=~"5.."}
+      total:
+        metric: http_server_request_duration_seconds_count{job="orders-api"}

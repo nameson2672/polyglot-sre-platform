@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slo-definitions
+  namespace: argocd
+  annotations:
+    # After pyrra (wave 7) so the ServiceLevelObjective CRD exists, and after the
+    # app workloads (wave 5) whose metrics the SLOs measure.
+    argocd.argoproj.io/sync-wave: "8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nameson2672/polyglot-sre-platform
+    targetRevision: main
+    # The 6 ServiceLevelObjective CRs (definitions/) + the saturation PrometheusRule
+    # (saturation/). Excludes pyrra/ which the `pyrra` Application owns.
+    path: platform/observability/slo
+    directory:
+      recurse: true
+      exclude: "pyrra/*"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
