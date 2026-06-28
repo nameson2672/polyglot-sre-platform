@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: orders
       POSTGRES_PASSWORD: orders_dev
-      POSTGRES_DB: orders
+      POSTGRES_DB: ordersdb
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro

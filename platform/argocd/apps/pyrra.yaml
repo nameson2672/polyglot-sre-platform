@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pyrra
+  namespace: argocd
+  annotations:
+    # After kube-prometheus-stack (wave 1) so the Prometheus Operator CRDs
+    # (PrometheusRule) Pyrra writes to already exist. Installs the SLO CRD +
+    # operator before the SLO definitions (wave 8).
+    argocd.argoproj.io/sync-wave: "7"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nameson2672/polyglot-sre-platform
+    targetRevision: main
+    # CRD + pyrra-kubernetes operator (generates PrometheusRules) + pyrra-api UI.
+    path: platform/observability/slo/pyrra
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Server-side apply for the large ServiceLevelObjective CRD.
+      - ServerSideApply=true

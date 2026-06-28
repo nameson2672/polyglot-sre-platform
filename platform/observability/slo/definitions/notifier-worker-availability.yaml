@@ -1,0 +1,22 @@
+apiVersion: pyrra.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: notifier-worker-availability
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: notifier-worker
+    app.kubernetes.io/part-of: polyglot-sre-platform
+    pyrra.dev/team: platform
+    release: kube-prometheus-stack
+spec:
+  # Success ratio of event processing. status="success" is good; everything
+  # else (webhook_failed, invalid, ...) counts against the budget.
+  description: 99.5% of consumed events are processed successfully.
+  target: "99.5"
+  window: 4w
+  indicator:
+    ratio:
+      errors:
+        metric: notifier_events_consumed_total{job="notifier-worker",status!="success"}
+      total:
+        metric: notifier_events_consumed_total{job="notifier-worker"}
