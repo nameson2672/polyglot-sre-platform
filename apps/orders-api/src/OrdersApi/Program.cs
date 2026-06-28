@@ -117,7 +117,6 @@ try
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddEntityFrameworkCoreInstrumentation()
-            .AddRedisInstrumentation()
             .AddOtlpExporter(o => o.Endpoint = new Uri(otelEndpoint)))
         .WithMetrics(m => m
             .AddMeter(TelemetryConstants.MeterName)
@@ -142,14 +141,14 @@ try
 
     var app = builder.Build();
 
-    // //TODO Apply EF Core migrations at startup. In production, consider using a dedicated migration strategy instead.
-    // using (var scope = app.Services.CreateScope())
-    // {
-    //     var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
-    //     var connStr = db.Database.GetConnectionString();
+    //TODO Apply EF Core migrations at startup. In production, consider using a dedicated migration strategy instead.
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+        var connStr = db.Database.GetConnectionString();
 
-    //     db.Database.Migrate();
-    // }
+        db.Database.Migrate();
+    }
     app.UseMiddleware<ProblemDetailsMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
 
