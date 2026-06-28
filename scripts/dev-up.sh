@@ -48,7 +48,7 @@ set +a
 
 # ── Docker infra ─────────────────────────────────────────────────────────────
 echo "Starting Docker infra (postgres + redis)..."
-docker compose up -d
+docker compose up -d 
 
 # Wait for Postgres (TCP)
 echo "Waiting for Postgres on localhost:5432..."

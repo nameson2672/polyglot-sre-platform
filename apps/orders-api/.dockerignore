@@ -1,0 +1,12 @@
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/.git
+**/.gitignore
+**/README.md
+tests/
+*.slnx
+*.sln
+**/appsettings.json
+**/appsettings.Development.json
