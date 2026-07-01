@@ -1,6 +1,12 @@
 image:
   tag: "sha-2d4cb4b"
   pullPolicy: IfNotPresent
+ingress:
+  enabled: true
+  className: nginx
+  # nip.io wildcard DNS → resolves to the Hetzner ingress-nginx LB IP. Replace
+  # <LB_IP> with the load balancer address (kubectl -n ingress-nginx get svc).
+  host: checkout-bff.49.12.16.149.nip.io
 secrets:
   existingSecret: "checkout-bff-secrets"
   redisSecret: "redis-url"

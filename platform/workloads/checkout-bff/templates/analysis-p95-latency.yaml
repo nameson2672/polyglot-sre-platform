@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: p95-latency
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "checkout-bff.labels" . | nindent 4 }}
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: p95-latency
+      # p95 latency < 300ms. (The steady-state SLO in Pyrra is 500ms; the canary
+      # gate is deliberately tighter to catch latency regressions early — see ADR-0007.)
+      successCondition: len(result) == 0 || result[0] < 0.3
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.95, sum(rate(http_server_duration_seconds_bucket{job="checkout-bff",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}"}[2m])) by (le))

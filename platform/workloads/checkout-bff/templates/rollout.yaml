@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: {{ include "checkout-bff.fullname" . }}
   namespace: {{ .Release.Namespace }}
@@ -10,6 +10,47 @@ spec:
   selector:
     matchLabels:
       {{- include "checkout-bff.selectorLabels" . | nindent 6 }}
+  strategy:
+    canary:
+      # Stable/canary Services are swapped between the two ReplicaSets; the nginx
+      # traffic router shifts weight by patching a cloned "-canary" Ingress.
+      stableService: {{ include "checkout-bff.fullname" . }}
+      canaryService: {{ include "checkout-bff.fullname" . }}-canary
+      trafficRouting:
+        nginx:
+          stableIngress: {{ include "checkout-bff.fullname" . }}
+      steps:
+        - setWeight: 10
+        - pause: {duration: {{ .Values.rollout.pauseDuration }}}
+        - analysis:
+            templates:
+              - templateName: success-rate
+              - templateName: p95-latency
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: 25
+        - pause: {duration: {{ .Values.rollout.pauseDuration }}}
+        - analysis:
+            templates:
+              - templateName: success-rate
+              - templateName: p95-latency
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: 50
+        - pause: {duration: {{ .Values.rollout.pauseDuration }}}
+        - analysis:
+            templates:
+              - templateName: success-rate
+              - templateName: p95-latency
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: 100
   template:
     metadata:
       labels:

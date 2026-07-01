@@ -1,9 +1,24 @@
-replicaCount: 1
+# 5 replicas so canary weights (10/25/50/100 %) map to a meaningful pod count
+# and the canary emits enough traffic for the AnalysisRun to evaluate.
+replicaCount: 5
 
 image:
   repository: ghcr.io/nameson2672/checkout-bff
   pullPolicy: IfNotPresent
   tag: "latest"
+
+# Argo Rollouts canary progressive delivery. Steps are defined in
+# templates/rollout.yaml; this only tunes the pause between them.
+rollout:
+  pauseDuration: 2m
+
+ingress:
+  enabled: true
+  className: nginx
+  # Overridden per-environment (see values-dev.yaml). The nginx traffic router
+  # needs a stable Ingress to clone for the canary weight split.
+  host: checkout-bff.local
+  annotations: {}
 
 imagePullSecrets: []
 

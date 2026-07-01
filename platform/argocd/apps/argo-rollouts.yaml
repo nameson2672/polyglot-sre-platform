@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  annotations:
+    # Controller + CRDs must exist before checkout-bff (wave 6) is synced as a
+    # Rollout. Wave 1 alongside the other cluster-level operators.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.37.7
+    helm:
+      valuesObject:
+        # Install the Rollout/AnalysisTemplate/... CRDs with the chart.
+        installCRDs: true
+        controller:
+          replicas: 1
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: false   # kube-prometheus-stack scrapes via annotations
+        # Read-only demo UI: `kubectl argo rollouts dashboard` also works, but the
+        # in-cluster dashboard is handy for the canary-demo recording.
+        dashboard:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # CRDs are large; apply server-side to avoid last-applied annotation limits.
+      - ServerSideApply=true

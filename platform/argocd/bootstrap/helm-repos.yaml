@@ -87,3 +87,19 @@ data:
   url: aHR0cHM6Ly9ncmFmYW5hLmdpdGh1Yi5pby9oZWxtLWNoYXJ0cw==
   name: Z3JhZmFuYQ==
   type: aGVsbQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-argo-helm
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+data:
+  # https://argoproj.github.io/argo-helm
+  url: aHR0cHM6Ly9hcmdvcHJvai5naXRodWIuaW8vYXJnby1oZWxt
+  name: YXJnby1oZWxt
+  type: aGVsbQ==
