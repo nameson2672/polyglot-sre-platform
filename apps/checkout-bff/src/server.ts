@@ -11,6 +11,7 @@ import { config } from './config.js';
 import { requestIdPlugin } from './plugins/requestId.js';
 import { jwtStubPlugin } from './plugins/jwtStub.js';
 import { metricsPlugin } from './plugins/metrics.js';
+import { chaosPlugin } from './plugins/chaos.js';
 import { problemDetailsPlugin } from './plugins/problemDetails.js';
 import { healthRoutes, setShuttingDown } from './routes/health.js';
 import { metricsRoutes } from './routes/metrics.js';
@@ -124,6 +125,9 @@ export async function start(): Promise<void> {
     retryAfter: 50,
   });
   await app.register(metricsPlugin);
+  // After metricsPlugin so injected 500s are still counted by the onResponse
+  // hook (and thus visible to the canary AnalysisRun). No-op unless CHAOS_ERROR_RATE > 0.
+  await app.register(chaosPlugin);
   await app.register(healthRoutes);
   await app.register(metricsRoutes);
   await app.register(checkoutRoutes, { prefix: '/v1' });

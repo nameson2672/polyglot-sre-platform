@@ -8,6 +8,11 @@ metadata:
     # keeps ownership obvious.
     release: kube-prometheus-stack
 spec:
+  # Expose the Argo Rollouts canary pod-template-hash as the metric label
+  # `rollouts_pod_template_hash` so canary AnalysisTemplates can scope queries to
+  # canary pods only (dashes become underscores in Prometheus label names).
+  podTargetLabels:
+    - rollouts-pod-template-hash
   # The checkout-bff Service lives in the dev namespace.
   namespaceSelector:
     matchNames: ["dev"]

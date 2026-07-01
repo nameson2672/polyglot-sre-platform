@@ -11,6 +11,10 @@ const ConfigSchema = z.object({
   PAYMENT_STUB_LATENCY_MS: z.coerce.number().default(300),
   PAYMENT_STUB_FAILURE_RATE: z.coerce.number().default(0.02),
   PAYMENT_STUB_LATENCY_JITTER_MS: z.coerce.number().default(0),
+  // Chaos: fraction (0-1) of business requests answered with a synthetic 500.
+  // Default 0 (no impact). The `bad-v2` image bakes in 0.05 to trip the canary
+  // AnalysisRun and demonstrate auto-rollback.
+  CHAOS_ERROR_RATE: z.coerce.number().min(0).max(1).default(0),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4317'),
   SERVICE_VERSION: z.string().default('0.1.0'),
   SERVICE_COMMIT: z.string().default('unknown'),

@@ -27,8 +27,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY package.json ./
 
+# Chaos injection is off by default. The `bad-v2` demo image is built with
+# `--build-arg CHAOS_ERROR_RATE=0.05` so the image itself returns ~5% 500s.
+ARG CHAOS_ERROR_RATE=0
+
 ENV NODE_ENV=production \
-    APP_ENV=production
+    APP_ENV=production \
+    CHAOS_ERROR_RATE=${CHAOS_ERROR_RATE}
 
 EXPOSE 8081
 

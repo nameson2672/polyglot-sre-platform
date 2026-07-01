@@ -1,0 +1,58 @@
+name: chaos-image
+
+# Manually build and push a deliberately-broken checkout-bff image that returns
+# ~5% synthetic 500s (CHAOS_ERROR_RATE baked in at build time). Used to demo the
+# Argo Rollouts canary AnalysisRun catching a bad release and auto-rolling back.
+#
+# This never runs automatically. After pushing, bump image.tag in
+# platform/workloads/checkout-bff/values-dev.yaml to the chosen tag (default
+# `bad-v2`) to trigger the canary via ArgoCD.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to publish'
+        required: true
+        default: 'bad-v2'
+      error_rate:
+        description: 'CHAOS_ERROR_RATE baked into the image (0-1)'
+        required: true
+        default: '0.05'
+
+concurrency:
+  group: chaos-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: nameson2672
+  SERVICE: checkout-bff
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ env.SERVICE }}
+          file: apps/${{ env.SERVICE }}/Dockerfile
+          push: true
+          build-args: |
+            CHAOS_ERROR_RATE=${{ github.event.inputs.error_rate }}
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.SERVICE }}:${{ github.event.inputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

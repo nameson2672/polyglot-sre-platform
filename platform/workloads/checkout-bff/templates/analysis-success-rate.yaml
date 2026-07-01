@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "checkout-bff.labels" . | nindent 4 }}
+spec:
+  args:
+    # Injected by the Rollout (valueFrom.podTemplateHashValue) so the query is
+    # scoped to canary pods only — stable traffic never dilutes the signal.
+    - name: canary-hash
+  metrics:
+    - name: success-rate
+      # Error rate < 1%  ⇔  non-5xx ratio ≥ 0.99. `len(result) == 0` tolerates the
+      # brief window before the canary has served any traffic.
+      successCondition: len(result) == 0 || result[0] >= 0.99
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_server_duration_seconds_count{job="checkout-bff",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}",status_code!~"5.."}[2m]))
+            /
+            sum(rate(http_server_duration_seconds_count{job="checkout-bff",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}"}[2m]))
