@@ -112,6 +112,11 @@ export async function checkoutRoutes(app: FastifyInstance): Promise<void> {
     } catch (err) {
       if (err instanceof OrdersApiError && err.statusCode >= 500) {
         checkoutAttemptsTotal.inc({ outcome: 'orders_api_error' });
+        // Returned (not thrown), so the error handler never sees it — log here.
+        req.log.error(
+          { customer_id: customerId, upstream_status: err.statusCode },
+          'orders-api unavailable after retries',
+        );
         return reply
           .status(503)
           .header('content-type', 'application/problem+json')

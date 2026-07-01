@@ -11,6 +11,7 @@ import { config } from './config.js';
 import { requestIdPlugin } from './plugins/requestId.js';
 import { jwtStubPlugin } from './plugins/jwtStub.js';
 import { metricsPlugin } from './plugins/metrics.js';
+import { requestLogPlugin } from './plugins/requestLog.js';
 import { chaosPlugin } from './plugins/chaos.js';
 import { problemDetailsPlugin } from './plugins/problemDetails.js';
 import { healthRoutes, setShuttingDown } from './routes/health.js';
@@ -104,7 +105,10 @@ function buildApp() {
       ]),
     },
     genReqId: () => crypto.randomUUID(),
-    disableRequestLogging: false,
+    // Policy: errors + business events only. The requestLogPlugin logs failed
+    // requests (4xx/5xx) instead; per-request access noise (incl. probes/scrapes)
+    // is tracked as metrics, not logs.
+    disableRequestLogging: true,
   });
 
   return app;
@@ -125,6 +129,7 @@ export async function start(): Promise<void> {
     retryAfter: 50,
   });
   await app.register(metricsPlugin);
+  await app.register(requestLogPlugin);
   // After metricsPlugin so injected 500s are still counted by the onResponse
   // hook (and thus visible to the canary AnalysisRun). No-op unless CHAOS_ERROR_RATE > 0.
   await app.register(chaosPlugin);

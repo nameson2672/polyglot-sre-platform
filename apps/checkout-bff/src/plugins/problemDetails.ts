@@ -5,8 +5,6 @@ import { ZodError } from 'zod';
 export async function problemDetailsPlugin(app: FastifyInstance): Promise<void> {
   app.setErrorHandler(
     async (error: FastifyError | Error, req: FastifyRequest, reply: FastifyReply) => {
-      req.log.error({ err: error }, 'Request error');
-
       if (error instanceof ZodError) {
         return reply
           .status(400)
@@ -22,10 +20,12 @@ export async function problemDetailsPlugin(app: FastifyInstance): Promise<void> 
 
       const statusCode = (error as FastifyError).statusCode ?? 500;
 
-      // Mark the request span errored on genuine server errors (5xx) so the failing
-      // request shows red in Tempo with the stack trace attached. Client errors
-      // (validation 400s above) deliberately leave the span clean.
+      // Only genuine server errors (5xx) are worth an error log — with the stack.
+      // Client errors (validation/4xx) are deliberately not error-logged to keep
+      // the logs to actionable events; the requestLog hook records them at warn.
       if (statusCode >= 500) {
+        req.log.error({ err: error }, 'Unhandled exception');
+        // Mark the request span errored so it shows red in Tempo with the stack.
         const span = trace.getActiveSpan();
         span?.recordException(error);
         span?.setStatus({ code: SpanStatusCode.ERROR, message: error.message });

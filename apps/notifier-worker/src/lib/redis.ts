@@ -11,7 +11,9 @@ export function createRedisClient(): Redis {
   });
 
   client.on('connect', () => {
-    logger.info('Redis connected');
+    // debug: fires on every (re)connect — noisy during reconnect storms and not
+    // actionable on its own. Failures ('error'/'close' below) stay at warn/error.
+    logger.debug('Redis connected');
     redisConnected.set(1);
   });
 

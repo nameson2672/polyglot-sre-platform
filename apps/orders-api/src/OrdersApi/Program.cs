@@ -37,6 +37,9 @@ try
         config
             .ReadFrom.Configuration(ctx.Configuration)
             .ReadFrom.Services(services)
+            // Default floor so request-log Verbose (successful/probe traffic) is
+            // dropped even if no Serilog section is present in configuration.
+            .MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .Enrich.WithEnvironmentName()
@@ -152,9 +155,16 @@ try
     app.UseMiddleware<ProblemDetailsMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
 
+    // Policy: errors + business events only. Successful requests — including
+    // probe (/healthz, /readyz) and metrics traffic that returns 2xx — map to
+    // Verbose, which is below the Information minimum and therefore dropped.
+    // Only client errors (4xx) and server errors/exceptions (5xx) are logged.
     app.UseSerilogRequestLogging(opts =>
     {
-        opts.GetLevel = (ctx, _, _) => LogEventLevel.Debug;
+        opts.GetLevel = (ctx, _, ex) =>
+            ex is not null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error
+            : ctx.Response.StatusCode >= 400 ? LogEventLevel.Warning
+            : LogEventLevel.Verbose;
     });
 
     app.MapOpenApi();

@@ -1,11 +1,11 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
+import { isExemptPath } from '../lib/paths.js';
 
 // Probe and scrape paths must stay healthy so Kubernetes keeps the pod in the
 // Service and Prometheus keeps scraping — otherwise the canary would fail the
 // readiness gate instead of the AnalysisRun, which defeats the demo.
-const EXEMPT_PATHS = new Set(['/healthz', '/readyz', '/metrics']);
 
 async function chaosPluginImpl(app: FastifyInstance): Promise<void> {
   if (config.CHAOS_ERROR_RATE <= 0) {
@@ -19,7 +19,7 @@ async function chaosPluginImpl(app: FastifyInstance): Promise<void> {
   );
 
   app.addHook('onRequest', async (req, reply) => {
-    if (EXEMPT_PATHS.has(req.url.split('?')[0]!)) {
+    if (isExemptPath(req.url)) {
       return;
     }
     if (Math.random() < config.CHAOS_ERROR_RATE) {
