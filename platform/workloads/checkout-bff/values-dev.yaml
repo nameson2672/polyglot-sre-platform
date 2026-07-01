@@ -1,5 +1,5 @@
 image:
-  tag: "sha-9cda762"
+  tag: "bad-v1"
   pullPolicy: IfNotPresent
 ingress:
   enabled: true
