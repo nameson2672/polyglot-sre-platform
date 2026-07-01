@@ -7,6 +7,9 @@ metadata:
     {{- include "checkout-bff.labels" . | nindent 4 }}
 spec:
   args:
+    # job=~"checkout-bff.*" (not job="checkout-bff") so the canary pods — scraped
+    # as job="checkout-bff-canary" mid-rollout — are included; the pod-template
+    # hash keeps the query isolated to the canary ReplicaSet. See ADR-0007.
     - name: canary-hash
   metrics:
     - name: p95-latency
@@ -20,4 +23,4 @@ spec:
         prometheus:
           address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
           query: |
-            histogram_quantile(0.95, sum(rate(http_server_duration_seconds_bucket{job="checkout-bff",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}"}[2m])) by (le))
+            histogram_quantile(0.95, sum(rate(http_server_duration_seconds_bucket{job=~"checkout-bff.*",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}"}[2m])) by (le))

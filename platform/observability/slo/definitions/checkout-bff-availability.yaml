@@ -11,12 +11,16 @@ metadata:
 spec:
   # 4xx (e.g. 402 payment-declined) are business outcomes, not service errors,
   # so only 5xx count against the availability budget.
+  # job=~"checkout-bff.*" spans both the stable ("checkout-bff") and canary
+  # ("checkout-bff-canary") scrape jobs — the ServiceMonitor matches both
+  # Services and Prometheus names the job after the Service — so canary traffic
+  # is counted against the SLO during an Argo Rollouts canary. See ADR-0007.
   description: 99.5% of checkout-bff HTTP requests succeed (non-5xx).
   target: "99.5"
   window: 4w
   indicator:
     ratio:
       errors:
-        metric: http_server_duration_seconds_count{job="checkout-bff",status_code=~"5.."}
+        metric: http_server_duration_seconds_count{job=~"checkout-bff.*",status_code=~"5.."}
       total:
-        metric: http_server_duration_seconds_count{job="checkout-bff"}
+        metric: http_server_duration_seconds_count{job=~"checkout-bff.*"}

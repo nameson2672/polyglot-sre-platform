@@ -9,12 +9,14 @@ metadata:
     pyrra.dev/team: platform
     release: kube-prometheus-stack
 spec:
+  # job=~"checkout-bff.*" spans both the stable and canary ("checkout-bff-canary")
+  # scrape jobs so canary traffic counts during an Argo Rollouts canary. See ADR-0007.
   description: 95% of checkout-bff HTTP requests complete in under 500ms (p95 < 500ms).
   target: "95"
   window: 4w
   indicator:
     latency:
       success:
-        metric: http_server_duration_seconds_bucket{job="checkout-bff",le="0.5"}
+        metric: http_server_duration_seconds_bucket{job=~"checkout-bff.*",le="0.5"}
       total:
-        metric: http_server_duration_seconds_count{job="checkout-bff"}
+        metric: http_server_duration_seconds_count{job=~"checkout-bff.*"}
