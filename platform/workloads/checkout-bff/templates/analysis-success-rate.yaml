@@ -20,7 +20,7 @@ spec:
       failureLimit: 1
       provider:
         prometheus:
-          address: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+          address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
           query: |
             sum(rate(http_server_duration_seconds_count{job="checkout-bff",rollouts_pod_template_hash="{{ `{{args.canary-hash}}` }}",status_code!~"5.."}[2m]))
             /
